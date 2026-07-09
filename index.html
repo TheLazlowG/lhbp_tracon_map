@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; }
+        #radar-scope { width: 100vw; height: 100vh; background: #080808; }
+        
+        /* Tactical Control Panel UI */
+        .radar-ui-panel {
+            position: absolute;
+            top: 0px;
+            right: 0px;
+            background: rgba(8, 8, 8, 0.9);
+            border: 1px solid #ffffff;
+            padding: 12px 16px;
+            z-index: 1000;
+            font-family: 'Noto Sans Mono', monospace;
+            color: #ffffff;
+            border-radius: 2px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 180px;
+        }
+        .radar-ui-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 4px;
+        }
+        
+        /* Search Bar Engine Styles */
+        .radar-search-container {
+            margin-bottom: 14px;
+        }
+        .radar-search-input {
+            width: 100%;
+            background: #141414;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: #ffffff;
+            padding: 6px;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 11px;
+            box-sizing: border-box;
+            border-radius: 2px;
+        }
+        .radar-search-input:focus {
+            outline: none;
+            border-color: #FFFF00;
+            box-shadow: 0 0 4px rgba(255, 255, 0, 0.2);
+        }
+
+        .radar-ui-section {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 10px 0 4px 0;
+        }
+        .radar-ui-control {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            font-size: 11px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .radar-ui-control input[type="checkbox"] {
+            margin: 0 8px 0 0;
+            cursor: pointer;
+            accent-color: #ffffff;
+        }
+
+        /* Altitude Filter Slider Controls */
+        .radar-slider-container {
+            margin: 8px 0 4px 0;
+            padding: 4px 0;
+        }
+        .radar-slider-output {
+            font-size: 11px;
+            font-weight: bold;
+            color: #5DEB3D;
+            margin-bottom: 4px;
+        }
+        .radar-ui-slider {
+            width: 100%;
+            margin: 0;
+            accent-color: #ffffff;
+            cursor: pointer;
+            background: #222;
+        }
+
+        /* Waypoint Alphanumeric Text Styling */
+        .fix-label {
+            color: #8A8A8A;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 11px;
+            font-weight: normal;
+            text-shadow: none;
+            background: none;
+            border: none;
+        }
+
+        /* ATC Target Label (Datablock) */
+        .atc-label {
+            color: #5DEB3D;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 12px;
+			font-weight: normal;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+
+        /* Clean containers for custom markers */
+        .wp-triangle-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        /* Strip out all tooltip pointer arrows/triangles completely */
+        .leaflet-tooltip {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .leaflet-tooltip:before {
+            display: none !important;
+        }
+        
+        /* ATC Target Square */
+        .atc-target-icon {
+            background: #5DEB3D;
+            width: 4px;
+            height: 4px;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div class="radar-ui-panel">
+        <div class="radar-ui-title">Radar Search</div>
+        <div class="radar-search-container">
+            <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
+        </div>
+
+        <div class="radar-ui-title">Scope Display</div>
+        
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-traffic" checked> AIR TRAFFIC
+        </label>
+        
+        <label class="radar-ui-control">
+            <input type="checkbox" id="callsign-format-long" checked> TELEPHONY CALLSIGNS
+        </label>
+        
+        <div class="radar-slider-container">
+            <div class="radar-ui-section" style="margin: 0 0 2px 0;">Max Altitude</div>
+            <div class="radar-slider-output" id="alt-filter-val">FL250</div>
+            <input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250">
+        </div>
+
+        <div class="radar-ui-section">ACFT Data Source</div>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="src-mlat"> MLAT
+        </label>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="src-other" checked> OTHER SOURCES
+        </label>
+		
+		<div class="radar-ui-section">Map options</div>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
+        </label>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-extensions" checked> RWY EXTENSIONS
+        </label>
+
+        <div class="radar-ui-section">Airspace</div>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
+        </label>
+
+        <div class="radar-ui-section">Departures</div>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-sid31l"> SID 31L
+        </label>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-sid13l"> SID 13L
+        </label>
+
+        <div class="radar-ui-section">Arrivals</div>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-star31"> STAR 31L/31R
+        </label>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-star13"> STAR 13L/13R
+        </label>
+    </div>
+
+    <div id="radar-scope"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // ==========================================
+        // Telephony Translation Cache & Utilities
+        // ==========================================
+        const AIRLINE_TELEPHONY = {
+            "RYR": "RYANAIR", "WZZ": "WIZZAIR", "WMT": "WIZZMALTA", "UTN": "UT-UKRAINE", "VJA": "ICONIC",
+            "EJU": "EASY", "EZY": "EASY", "EZS": "EASY", "TKJ": "ANATOLIA", "HUA": "HUNGARY", 
+            "DLH": "LUFTHANSA","KLM": "KLM", "AFR": "AIR FRANCE", "BEL": "BEELINE",
+            "BAW": "SPEEDBIRD","THY": "TURKISH", "UAE": "EMIRATES", "MGH": "MAVI",
+            "QTR": "QATARI", "SWR": "SWISS", "AUA": "AUSTRIAN", "JSD": "ALPOK",
+            "FIN": "FINNAIR", "SAS": "SCANDINAVIAN","NOR": "NORSE", "NSZ": "REDNOSE",
+            "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC",
+            "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA",
+            "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN",
+            "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN",
+            "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING",
+            "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL"
+        };
+
+        // Asynchronously fetch and map thousands of dynamic airline designators on application startup
+        async function initAirlineDatabase() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/npow/airline-codes/master/airlines.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                data.forEach(airline => {
+                    if (airline.icao && airline.callsign) {
+                        const icaoKey = airline.icao.toUpperCase().trim();
+                        // Prefer predefined script callsigns if they already exist
+                        if (!AIRLINE_TELEPHONY[icaoKey]) {
+                            AIRLINE_TELEPHONY[icaoKey] = airline.callsign.toUpperCase().trim();
+                        }
+                    }
+                });
+                console.log(`Global database connected. Loaded ${Object.keys(AIRLINE_TELEPHONY).length} telephony profiles.`);
+            } catch (err) {
+                console.warn("External airline telemetry directory unresolvable, relying on expanded core cache:", err);
+            }
+        }
+
+        // Helper function to format short ICAO callsign to controller spoken telephony
+        function getFormattedCallsign(callsign, useLongFormat) {
+            if (!useLongFormat || !callsign) return callsign;
+            
+            if (/^[A-Za-z]{5}$/.test(callsign.trim())) {
+                return callsign;
+            }
+            
+            const prefix = callsign.substring(0, 3).toUpperCase();
+            if (AIRLINE_TELEPHONY[prefix]) {
+                return AIRLINE_TELEPHONY[prefix] + " " + callsign.substring(3);
+            }
+            return callsign;
+        }
+
+        // Global State Variable for Telephony Toggle
+        let useLongCallsign = false;
+
+        // 1. Initialize map centered on Budapest Airport (LHBP)
+        const map = L.map('radar-scope', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([47.4369, 19.2556], 9.5);
+        
+        // Pure black tactical basemap
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        // 2. Exact coordinates for LHBP Runway Thresholds 
+        const rwy13R = [47.4487, 19.2208]; 
+        const rwy31L = [47.4305, 19.2502]; 
+        const rwy13L = [47.4454, 19.2575]; 
+        const rwy31R = [47.4230, 19.2939]; 
+
+        // 3. Complete Master Waypoints
+        const waypoints = {
+            "ABONY": [47.19083, 20.01056],
+            "ALZUR": [47.74256, 18.95719], 
+            "ANEXA": [47.85470, 18.48610],
+            "ARFOX": [47.97440, 18.57420],
+            "ATICO": [47.22286, 19.40292],
+            "BADOV": [48.02111, 18.81583],
+            "BEREV": [47.40414, 19.50589],
+            "BETED": [48.08330, 20.23330],
+            "BP328": [47.32186, 19.39489],
+            "BP329": [47.36364, 19.45117],
+            "BP331": [47.37586, 19.36978],
+            "BP701": [47.38831, 19.38439],
+            "BP702": [47.58806, 19.71853],
+            "BP703": [47.78847, 19.39597],
+            "BP704": [47.96808, 19.10353],
+            "BP705": [47.93822, 19.60047],
+            "BP711": [47.36628, 19.35417],
+            "BP712": [47.19042, 19.01619],
+            "BP723": [47.25497, 18.89439],
+            "BP733": [47.30597, 19.01456],
+            "BP734": [47.37361, 18.90436],
+            "BP735": [47.45461, 18.77225],
+            "BP736": [47.59628, 18.53928],
+            "BP741": [47.10417, 19.59164],
+            "BP742": [47.21558, 19.41389],
+            "BP743": [47.39200, 19.12992],
+            "BP744": [47.45889, 19.02144],
+            "BP753": [47.40472, 19.29186],
+            "BP754": [47.55436, 19.04922],
+            "BP755": [47.60383, 18.96917],
+            "BP756": [47.67106, 18.85975],
+            "BP763": [47.40142, 19.32861],
+            "BP764": [47.54942, 19.08886],
+            "BP765": [47.61431, 18.98308],
+            "BP766": [47.68133, 18.87336],
+            "BP772": [47.34906, 19.59414],
+            "BP774": [47.59264, 19.20158],
+            "BP783": [47.61136, 19.42658],
+            "BP784": [47.67847, 19.31814],
+            "BP785": [47.76111, 19.18028],
+            "BP786": [47.88178, 18.98692],
+            "BP801": [47.47853, 19.17244],
+            "BP802": [47.65342, 18.95778],
+            "BP803": [47.80253, 19.16431],
+            "BP811": [47.70369, 19.32033],
+            "BP812": [47.81747, 19.47942],
+            "BP813": [48.08153, 19.55533],
+            "BP821": [47.33642, 18.98847],
+            "BP822": [47.09994, 18.82711],
+            "BP834": [47.19161, 19.01328],
+            "BP835": [47.07417, 19.20394],
+            "BP836": [47.00936, 19.30858],
+            "BP837": [46.94203, 19.41686],
+            "BP840": [47.68922, 18.64422],
+            "BP841": [47.60203, 18.78772],
+            "BP842": [47.51908, 18.92350],
+            "BP843": [47.43536, 19.05992],
+            "BP844": [47.34106, 19.21269],
+            "BP854": [47.35983, 19.36419],
+            "BP855": [47.28428, 19.48556],
+            "BP856": [47.21667, 19.59369],
+            "BP863": [47.46694, 19.22272],
+            "BP864": [47.35114, 19.40956],
+            "BP865": [47.29486, 19.49986],
+            "BP866": [47.22725, 19.60797],
+            "BP870": [47.82369, 18.82367],
+            "BP871": [47.70031, 19.02617],
+            "BP872": [47.59072, 19.20467],
+            "BP874": [47.44536, 19.43964],
+            "BP883": [47.63419, 19.45767],
+            "BP884": [47.55361, 19.59056],
+            "BP885": [47.46686, 19.73292],
+            "CATUZ": [47.67583, 19.06614],
+            "DUZLA": [46.95694, 18.73028],
+            "EBAMO": [46.83220, 19.59250],
+            "ECMAN": [47.54208, 18.88594],
+            "EDEMU": [48.17440, 19.80830],
+            "ERGOM": [47.79444, 18.74111],
+            "FAHAZ": [46.88861, 19.04861],
+            "FERER": [47.63694, 19.57194],
+            "FUTNA": [47.15228, 19.69622],
+            "GAZDA": [46.80528, 19.39694],
+            "GELSA": [47.01389, 19.78917],
+            "GIFRA": [47.74656, 18.76619],
+            "GILEP": [47.48339, 18.25878],
+            "HUZTA": [47.60817, 18.77761], 
+            "JOZEP": [47.18917, 18.74028], 
+            "KATLI": [47.11861, 18.75167],
+            "KENES": [47.04583, 18.39778],
+            "KERET": [47.69750, 18.44194],
+            "KEZAL": [47.15360, 20.23140],
+            "LAHOR": [47.83167, 19.72806], 
+            "LITKU": [48.23053, 19.59853],
+            "LUCLA": [47.69619, 19.54222],
+            "MAMOR": [47.53389, 19.98972],
+            "MEZOS": [47.28861, 18.42306],
+            "NARKA": [47.83917, 19.82500],
+            "NICRA": [47.35619, 19.58272],
+            "OCRIT": [47.33503, 19.94539],
+            "ODVAS": [47.27083, 19.32631],
+            "OFENA": [47.16278, 19.71058],
+            "PUCOG": [47.41561, 18.59189],
+            "PUSTA": [47.45667, 18.17222],
+            "RW13L": [47.44542, 19.25756],
+            "RW13R": [47.44869, 19.22075],
+            "RW31L": [47.43047, 19.25025],
+            "RW31R": [47.42294, 19.29386],
+            "SOROS": [47.84278, 19.32611],
+            "TORAZ": [47.73603, 18.75164],
+            "TPS":   [47.49325, 19.44622], 
+            "ULPAX": [47.52561, 19.31019],
+            "ULZAK": [46.99420, 18.56690],
+            "UTCON": [47.28850, 19.69083], 
+            "VAJDI": [47.37560, 18.28580],
+            "VALVO": [47.60694, 19.69167],
+            "VETIK": [47.35278, 20.23250],
+            "WITRI": [48.14833, 20.12000],
+            "WONTA": [47.15533, 19.51103], 
+            "ZURFA": [47.39778, 19.84583]
+        };
+
+        // Monochromatic Layer Configurations
+        const runwayStyle = { color: '#ffffff', weight: 4, opacity: 0.9 };
+        const extensionStyle = { color: '#ffffff', weight: 1.2, opacity: 0.4 };
+        const tickLineStyle = { color: '#ffffff', weight: 1.2, opacity: 0.6 };
+        
+        const sid31LStyle = { color: '#ffffff', weight: 1.2, dashArray: '6, 4', opacity: 0.6 };
+        const sid13LStyle = { color: '#ffffff', weight: 1.2, dashArray: '2, 3', opacity: 0.7 };
+        const star31Style = { color: '#ffffff', weight: 1.5, dashArray: '10, 4, 2, 4', opacity: 0.6 };
+        const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5 };
+        const holdingStyle = { color: '#ffffff', weight: 1.2, opacity: 0.4 };
+
+        // Permanent Element Layer: Main Physical Runways
+        L.polyline([rwy13R, rwy31L], runwayStyle).addTo(map);
+        L.polyline([rwy13L, rwy31R], runwayStyle).addTo(map);
+
+        // Define Toggleable Leaflet Layer Groups
+        const trafficGroup = L.layerGroup().addTo(map);
+        const waypointsGroup = L.layerGroup().addTo(map);
+        const extensionsGroup = L.layerGroup().addTo(map);
+        const holdingGroup = L.layerGroup(); 
+        
+        const sid31lGroup = L.layerGroup();
+        const sid13lGroup = L.layerGroup(); 
+        const star31Group = L.layerGroup();
+        const star13Group = L.layerGroup();
+
+        // 4. Helper Function to calculate point offset by Nautical Miles (NM) and Bearing (Degrees)
+        function getOffsetPoint(startPoint, distanceNM, bearingDegrees) {
+            const R = 3440.065; 
+            const dist = distanceNM / R;
+            const brng = (bearingDegrees * Math.PI) / 180;
+            
+            const lat1 = (startPoint[0] * Math.PI) / 180;
+            const lon1 = (startPoint[1] * Math.PI) / 180;
+
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(dist) + Math.cos(lat1) * Math.sin(dist) * Math.cos(brng));
+            const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(dist) * Math.cos(lat1), Math.cos(dist) - Math.sin(lat1) * Math.sin(lat2));
+
+            return [(lat2 * 180) / Math.PI, (lon2 * 180) / Math.PI];
+        }
+
+        // 5. Generate Solid Centerlines and Directional Outward Range Ticks
+        function buildApproachRadar(threshold, heading, name) {
+            const endPoint = getOffsetPoint(threshold, 20, heading);
+            L.polyline([threshold, endPoint], extensionStyle).addTo(extensionsGroup);
+
+            let tickHeading;
+            if (name === "13R") {
+                tickHeading = (heading - 90 + 360) % 360; 
+            } else if (name === "31L") {
+                tickHeading = (heading + 90) % 360;        
+            } else if (name === "13L") {
+                tickHeading = (heading + 90) % 360;        
+            } else if (name === "31R") {
+                tickHeading = (heading - 90 + 360) % 360; 
+            }
+
+            for (let miles = 5; miles <= 20; miles += 5) {
+                const tickCoord = getOffsetPoint(threshold, miles, heading);
+                const tickEnd = getOffsetPoint(tickCoord, 0.3, tickHeading); 
+                L.polyline([tickCoord, tickEnd], tickLineStyle).addTo(extensionsGroup);
+            }
+        }
+
+        // 6. Define Triangle Icon for fixes
+        const triangleIcon = L.divIcon({
+            className: 'wp-triangle-icon',
+            html: '<svg width="10" height="10" viewBox="0 0 10 10" style="display:block;"><polygon points="5,1 9,9 1,9" fill="#000000" stroke="#8A8A8A" stroke-width="1.5"/></svg>',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+        });
+
+        // Track and map reference instances of Waypoint Markers for search hooks
+        const waypointMarkers = {};
+
+        Object.keys(waypoints).forEach(fixName => {
+            const marker = L.marker(waypoints[fixName], { icon: triangleIcon })
+             .addTo(waypointsGroup);
+             
+             marker.bindTooltip(fixName, {
+                permanent: true,
+                direction: 'top',
+                className: 'fix-label',
+                offset: [0, 8]
+            });
+            
+            waypointMarkers[fixName] = marker;
+        });
+
+        buildApproachRadar(rwy13R, 312.5, "13R");
+        buildApproachRadar(rwy13L, 312.5, "13L");
+        buildApproachRadar(rwy31L, 132.5, "31L");
+        buildApproachRadar(rwy31R, 132.5, "31R");
+
+        const wp = waypoints;
+
+        // SID 31L
+        L.polyline([rwy31L, wp["BP801"], wp["BP821"], wp["BP822"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP801"], wp["BP802"], wp["BP803"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP801"], wp["BP811"], wp["BP812"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP803"], wp["BP812"], wp["VETIK"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP803"], wp["WITRI"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP812"], wp["WITRI"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP803"], wp["BP813"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP803"], wp["BADOV"]], sid31LStyle).addTo(sid31lGroup);
+		L.polyline([wp["BP821"], wp["PUCOG"], wp["GILEP"]], sid31LStyle).addTo(sid31lGroup);
+		L.polyline([wp["BP822"], wp["DUZLA"]], sid31LStyle).addTo(sid31lGroup);
+		L.polyline([wp["BP822"], wp["FAHAZ"]], sid31LStyle).addTo(sid31lGroup);
+		L.polyline([wp["BP822"], wp["GAZDA"]], sid31LStyle).addTo(sid31lGroup);
+
+		// SID 13L
+		L.polyline([rwy13L, wp["BP701"], wp["BP712"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP701"], wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
+		L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
+
+		// STAR 31L/31R
+        L.polyline([wp["ANEXA"], wp["BP840"], wp["BP841"], wp["BP842"], wp["BP843"], wp["BP844"], wp["ATICO"]], star31Style).addTo(star31Group);
+        L.polyline([wp["ARFOX"], wp["BP870"], wp["BP871"], wp["BP872"], wp["ULPAX"], wp["BP874"], wp["NICRA"]], star31Style).addTo(star31Group);
+        L.polyline([wp["VAJDI"], wp["JOZEP"], wp["BP834"], wp["BP844"]], star31Style).addTo(star31Group);
+        L.polyline([wp["ULZAK"], wp["JOZEP"]], star31Style).addTo(star31Group);
+        L.polyline([wp["EBAMO"], wp["BP837"], wp["BP836"], wp["BP835"], wp["BP834"]], star31Style).addTo(star31Group);
+        L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP885"], wp["BP884"], wp["BP883"], wp["ULPAX"]], star31Style).addTo(star31Group);
+        L.polyline([wp["EDEMU"], wp["LAHOR"], wp["LUCLA"], wp["BP883"]], star31Style).addTo(star31Group);
+        L.polyline([wp["BETED"], wp["LAHOR"]], star31Style).addTo(star31Group);
+		
+		// STAR 13L/13R
+        L.polyline([wp["EBAMO"], wp["BP741"], wp["BP742"], wp["BP743"], wp["BP744"], wp["ECMAN"]], star13Style).addTo(star13Group);
+        L.polyline([wp["ULZAK"], wp["JOZEP"], wp["BP723"], wp["BP733"], wp["BP743"]], star13Style).addTo(star13Group);
+        L.polyline([wp["ANEXA"], wp["BP736"], wp["BP735"], wp["BP734"], wp["BP733"]], star13Style).addTo(star13Group);
+        L.polyline([wp["VAJDI"], wp["JOZEP"]], star13Style).addTo(star13Group);
+        L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP772"], wp["ULPAX"], wp["BP774"], wp["CATUZ"]], star13Style).addTo(star13Group);
+        L.polyline([wp["BETED"], wp["LAHOR"], wp["LUCLA"], wp["BP783"], wp["ULPAX"]], star13Style).addTo(star13Group);
+        L.polyline([wp["EDEMU"], wp["LAHOR"]], star13Style).addTo(star13Group);
+        L.polyline([wp["ARFOX"], wp["BP786"], wp["BP785"], wp["BP784"], wp["BP783"]], star13Style).addTo(star13Group);
+		
+        // ==========================================
+        // Real-world Precision Holding Pattern Vectors
+        // ==========================================
+        function buildHoldingPattern(fixName, inboundTrack, isRightHand) {
+            const fix = waypoints[fixName];
+            if (!fix) return;
+
+            const turnRadiusNM = 2;  
+            const legLengthNM = 5.0;   
+            const points = [];
+
+            const outboundTrack = (inboundTrack + 180) % 360;
+            const turnSign = isRightHand ? 1 : -1;
+            
+            const centerAngle1 = (inboundTrack + turnSign * 90 + 360) % 360;
+            const centerPoint1 = getOffsetPoint(fix, turnRadiusNM, centerAngle1);
+
+            const startRadial1 = (centerAngle1 + 180) % 360;
+            for (let i = 0; i <= 16; i++) {
+                const currentRadial = (startRadial1 + turnSign * (180 * i / 16) + 720) % 360;
+                points.push(getOffsetPoint(centerPoint1, turnRadiusNM, currentRadial));
+            }
+
+            const outboundStart = points[points.length - 1];
+            const outboundEnd = getOffsetPoint(outboundStart, legLengthNM, outboundTrack);
+
+            const centerAngle2 = (outboundTrack + turnSign * 90 + 360) % 360;
+            const centerPoint2 = getOffsetPoint(outboundEnd, turnRadiusNM, centerAngle2);
+
+            const startRadial2 = (centerAngle2 + 180) % 360;
+            for (let i = 0; i <= 16; i++) {
+                const currentRadial = (startRadial2 + turnSign * (180 * i / 16) + 720) % 360;
+                points.push(getOffsetPoint(centerPoint2, turnRadiusNM, currentRadial));
+            }
+
+            points.push(fix);
+            L.polyline(points, holdingStyle).addTo(holdingGroup);
+        }
+
+        buildHoldingPattern("JOZEP", 100, true);
+        buildHoldingPattern("HUZTA", 310, false);
+        buildHoldingPattern("ALZUR", 310, true);   
+        buildHoldingPattern("LAHOR", 230, false);
+        buildHoldingPattern("TPS",   246, false);
+        buildHoldingPattern("WONTA", 130, true);   
+        buildHoldingPattern("UTCON", 130, false);
+        buildHoldingPattern("ZURFA", 310, false);
+
+
+        // ==========================================
+        // 8. Air Traffic System (Live API Feeds Only)
+        // ==========================================
+        let aircraftState = {};
+        const SWEEP_INTERVAL_MS = 2000;
+        const RENDER_DELAY_MS = 2000;
+        const HISTORY_LENGTH = 30;
+        const PREDICT_MINUTES = 0.25;
+        const RADAR_CENTER = [47.4369, 19.2556];
+        const RADAR_RADIUS_NM = 150;
+        const RADAR_BBOX = { minLat: 46.5, minLon: 18.0, maxLat: 48.5, maxLon: 20.5 };
+
+        let trafficSource = 'connecting';
+        
+        const trafficStatusEl = document.createElement('div');
+        trafficStatusEl.className = 'radar-ui-section';
+        trafficStatusEl.id = 'traffic-source-status';
+        trafficStatusEl.textContent = 'Traffic: connecting...';
+        document.querySelector('.radar-ui-panel').appendChild(trafficStatusEl);
+
+        const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [8, 8] });
+
+        function setTrafficSource(source, statusText, siteDomain) {
+            trafficSource = source;
+            if (source === 'live') {
+                trafficStatusEl.textContent = `Feed: ${siteDomain} (${statusText})`;
+                trafficStatusEl.style.color = '#5DEB3D';
+            } else if (source === 'failed') {
+                trafficStatusEl.textContent = `Feed: Offline / Error`;
+                trafficStatusEl.style.color = '#FF3B30';
+            } else {
+                trafficStatusEl.textContent = `Feed: ${statusText}`;
+                trafficStatusEl.style.color = '#FFCC00';
+            }
+        }
+
+        function inRadarBox(lat, lon) {
+            return lat >= RADAR_BBOX.minLat && lat <= RADAR_BBOX.maxLat &&
+                   lon >= RADAR_BBOX.minLon && lon <= RADAR_BBOX.maxLon;
+        }
+
+        function initAircraftState(id, callsign, srcType) {
+            aircraftState[id] = {
+                id: id,
+                callsign: callsign,
+                actype: "UNK",
+                latestAlt: 0,
+                srcType: srcType || "OTHER",
+                telemetry: [],
+                historyDots: [],
+                featureGroup: L.featureGroup().addTo(trafficGroup),
+                ui: {
+                    marker: L.marker([0, 0], { icon: targetDivIcon, interactive: false, opacity: 0 }),
+                    speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.2, opacity: 0, interactive: false }),
+                    leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1, opacity: 0, interactive: false }),
+                    dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0 })
+                        .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label', offset: [0, -10] })
+                }
+            };
+            const ui = aircraftState[id].ui;
+            ui.marker.addTo(aircraftState[id].featureGroup);
+            ui.speedLine.addTo(aircraftState[id].featureGroup);
+            ui.leaderLine.addTo(aircraftState[id].featureGroup);
+            ui.dataBlock.addTo(aircraftState[id].featureGroup);
+        }
+
+        function processTrafficTargets(targets, sourceLabel, siteDomain) {
+            const now = Date.now();
+            const activeIds = new Set();
+
+            targets.forEach(t => {
+                activeIds.add(t.id);
+                if (!aircraftState[t.id]) {
+                    initAircraftState(t.id, t.call, t.srcType);
+                }
+                const state = aircraftState[t.id];
+                state.callsign = t.call;
+                state.actype = t.type || "UNK";
+                state.latestAlt = t.alt;
+                state.srcType = t.srcType || "OTHER";
+
+                const lastData = state.telemetry[state.telemetry.length - 1];
+                if (!lastData || lastData.lat !== t.lat || lastData.lon !== t.lon) {
+                    state.telemetry.push({ time: now, lat: t.lat, lon: t.lon, alt: t.alt, spd: t.spd, hdg: t.hdg });
+                    if (state.telemetry.length > 4) state.telemetry.shift();
+
+                    const dot = L.circleMarker([t.lat, t.lon], { radius: 1, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false }).addTo(state.featureGroup);
+                    state.historyDots.push(dot);
+                    if (state.historyDots.length > HISTORY_LENGTH) {
+                        const oldDot = state.historyDots.shift();
+                        state.featureGroup.removeLayer(oldDot);
+                    }
+                }
+            });
+
+            Object.keys(aircraftState).forEach(id => {
+                if (!activeIds.has(id)) {
+                    if (trafficGroup.hasLayer(aircraftState[id].featureGroup)) {
+                        trafficGroup.removeLayer(aircraftState[id].featureGroup);
+                    }
+                    delete aircraftState[id];
+                }
+            });
+
+            setTrafficSource('live', sourceLabel, siteDomain);
+            applyFiltering();
+        }
+
+        function applyFiltering() {
+            const limitFL = parseInt(document.getElementById('alt-filter-slider').value, 10);
+            const trafficLayerActive = document.getElementById('layer-traffic').checked;
+
+            // Updated to handle simplified filter architecture (MLAT vs OTHER)
+            const showMlat = document.getElementById('src-mlat').checked;
+            const showOther = document.getElementById('src-other').checked;
+
+            Object.keys(aircraftState).forEach(id => {
+                const state = aircraftState[id];
+                const fl = Math.round(state.latestAlt / 100);
+                
+                let matchesHardwareFilter = false;
+                if (state.srcType === 'MLAT' && showMlat) matchesHardwareFilter = true;
+                else if (state.srcType === 'OTHER' && showOther) matchesHardwareFilter = true;
+
+                if (trafficLayerActive && fl <= limitFL && matchesHardwareFilter) {
+                    if (!trafficGroup.hasLayer(state.featureGroup)) {
+                        trafficGroup.addLayer(state.featureGroup);
+                    }
+                } else {
+                    if (trafficGroup.hasLayer(state.featureGroup)) {
+                        trafficGroup.removeLayer(state.featureGroup);
+                    }
+                }
+            });
+        }
+
+        function renderLoop() {
+            const renderTime = Date.now() - RENDER_DELAY_MS;
+            const useLongFormat = document.getElementById('callsign-format-long').checked;
+
+            // Fetch live substring input buffer parameters dynamically
+            const searchInput = document.getElementById('radar-search');
+            const searchQuery = searchInput ? searchInput.value.toUpperCase().trim() : "";
+
+            Object.keys(aircraftState).forEach(id => {
+                const state = aircraftState[id];
+                if (state.telemetry.length < 2) return;
+
+                let interpLat, interpLon, interpAlt, interpSpd, interpHdg;
+                let p1 = null, p2 = null;
+
+                for (let i = 0; i < state.telemetry.length - 1; i++) {
+                    if (renderTime >= state.telemetry[i].time && renderTime <= state.telemetry[i+1].time) {
+                        p1 = state.telemetry[i];
+                        p2 = state.telemetry[i+1];
+                        break;
+                    }
+                }
+
+                if (p1 && p2) {
+                    const progress = (renderTime - p1.time) / (p2.time - p1.time);
+                    interpLat = p1.lat + (p2.lat - p1.lat) * progress;
+                    interpLon = p1.lon + (p2.lon - p1.lon) * progress;
+                    interpAlt = p1.alt + (p2.alt - p1.alt) * progress;
+                    interpSpd = p1.spd + (p2.spd - p1.spd) * progress;
+
+                    let diff = p2.hdg - p1.hdg;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+                    interpHdg = (p1.hdg + diff * progress) % 360;
+                    if (interpHdg < 0) interpHdg += 360;
+                } else {
+                    const latest = state.telemetry[state.telemetry.length - 1];
+                    if (renderTime > latest.time) {
+                        const timeDiffSec = (renderTime - latest.time) / 1000;
+                        const safeTimeDiff = Math.min(timeDiffSec, 6); 
+                        const distNM = (latest.spd / 3600) * safeTimeDiff;
+                        const projected = getOffsetPoint([latest.lat, latest.lon], distNM, latest.hdg);
+                        interpLat = projected[0];
+                        interpLon = projected[1];
+                        interpAlt = latest.alt;
+                        interpSpd = latest.spd;
+                        interpHdg = latest.hdg;
+                    } else {
+                        const oldest = state.telemetry[0];
+                        interpLat = oldest.lat;
+                        interpLon = oldest.lon;
+                        interpAlt = oldest.alt;
+                        interpSpd = oldest.spd;
+                        interpHdg = oldest.hdg;
+                    }
+                }
+
+                const currentPos = [interpLat, interpLon];
+                state.ui.marker.setLatLng(currentPos).setOpacity(1);
+
+                if (interpSpd > 30) {
+                    const distanceNM = (interpSpd / 60) * PREDICT_MINUTES;
+                    const projectedPos = getOffsetPoint(currentPos, distanceNM, interpHdg);
+                    state.ui.speedLine.setLatLngs([currentPos, projectedPos]).setStyle({opacity: 0.8});
+                    
+                    const leaderEnd = getOffsetPoint(currentPos, 1.5, 45); 
+                    state.ui.leaderLine.setLatLngs([currentPos, leaderEnd]).setStyle({opacity: 0.5});
+                    state.ui.dataBlock.setLatLng(leaderEnd);
+
+                    const flStr = Math.round(interpAlt / 100).toString().padStart(3, '0');
+                    const spdStr = Math.round(interpSpd).toString().padStart(3, '0');
+                    const labelCallsign = getFormattedCallsign(state.callsign, useLongFormat);
+                    
+                    let trend = "";
+                    if (state.telemetry.length > 1) {
+                        const oldest = state.telemetry[0];
+                        const diff = interpAlt - oldest.alt;
+                        if (diff > 50) trend = "▲";
+                        else if (diff < -50) trend = "▼";
+                    }
+
+                    // Scan target aircraft attributes against search key variables
+                    const isAircraftMatched = searchQuery && (
+                        state.callsign.toUpperCase().includes(searchQuery) || 
+                        labelCallsign.toUpperCase().includes(searchQuery)
+                    );
+
+                    // Dynamic tactical palette switching based on active search matches
+                    const callsignColor = isAircraftMatched ? '#FFFF00' : '#5DEB3D';
+                    const dataLineColor = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,1.0)';
+                    const acTypeColor   = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,0.5)';
+
+                    const blockHTML = `<div style="color:${callsignColor}; font-weight:${isAircraftMatched ? 'bold' : 'normal'};">${labelCallsign}</div>` +
+                                      `<div style="color:${dataLineColor};">F${flStr}${trend} &nbsp;${spdStr}</div>` +
+                                      `<div style="color:${acTypeColor};">${state.actype}</div>`;
+                    
+                    if (state.lastHTML !== blockHTML) {
+                        state.ui.dataBlock.setTooltipContent(blockHTML);
+                        state.lastHTML = blockHTML;
+                    }
+                    state.ui.dataBlock.setOpacity(1);
+                } else {
+                    state.ui.speedLine.setStyle({opacity: 0});
+                    state.ui.leaderLine.setStyle({opacity: 0});
+                    state.ui.dataBlock.setOpacity(0);
+                }
+            });
+
+            requestAnimationFrame(renderLoop);
+        }
+        requestAnimationFrame(renderLoop);
+
+        function processOpenSkyTraffic(data) {
+            if (!data || !Array.isArray(data.states)) throw new Error('No state baseline data');
+            const targets = [];
+            data.states.forEach(flight => {
+                const icao24 = flight[0].trim();
+                const callsign = flight[1] ? flight[1].trim() : 'UNK';
+                const lon = flight[5], lat = flight[6], onGround = flight[8];
+                if (!lat || !lon || onGround || !inRadarBox(lat, lon)) return;
+                
+                // Maps OpenSky types down to clean MLAT vs OTHER definitions
+                let srcType = 'OTHER';
+                if (flight[16] === 3) srcType = 'MLAT';
+
+                targets.push({
+                    id: icao24,
+                    call: callsign !== "" ? callsign : "UNK",
+                    lat,
+                    lon,
+                    alt: flight[7] ? Math.round(flight[7] * 3.28084) : 0,
+                    spd: flight[9] ? Math.round(flight[9] * 1.94384) : 0,
+                    hdg: flight[10] || 0,
+                    type: "UNK",
+                    srcType: srcType
+                });
+            });
+            if (targets.length === 0) throw new Error('Zero targets inside bbox perimeter');
+            processTrafficTargets(targets, `${targets.length} targets`, 'opensky-network.org');
+        }
+
+        function processAdsbTraffic(data) {
+            if (!data || !Array.isArray(data.ac)) throw new Error('Empty dataset returned');
+            const targets = [];
+            data.ac.forEach(ac => {
+                if (!ac.lat || !ac.lon || !inRadarBox(ac.lat, ac.lon)) return;
+                if (ac.alt_baro === 'ground') return;
+                
+                // Maps airplanes.live flags to unified MLAT vs OTHER structures safely
+                let srcType = 'OTHER';
+                
+                if (ac.type === 'adsb_icao' || ac.type === 'adsb_icao_nt' || ac.type === 'adsr_icao') {
+                    srcType = 'OTHER'; 
+                } 
+                else if (ac.type === 'mlat' || (ac.mlat && (Array.isArray(ac.mlat) ? ac.mlat.length > 0 : ac.mlat === true))) {
+                    srcType = 'MLAT';
+                }
+
+                targets.push({
+                    id: (ac.hex || ac.icao || 'UNK').trim(),
+                    call: ac.flight ? ac.flight.trim() : 'UNK',
+                    lat: ac.lat,
+                    lon: ac.lon,
+                    alt: typeof ac.alt_baro === 'number' ? Math.round(ac.alt_baro) : 0,
+                    spd: ac.gs ? Math.round(ac.gs) : 0,
+                    hdg: ac.track ?? ac.true_heading ?? ac.mag_heading ?? 0,
+                    type: ac.t ? ac.t.trim().toUpperCase() : 'UNK',
+                    srcType: srcType
+                });
+            });
+            if (targets.length === 0) throw new Error('Zero targets inside tracking sector');
+            processTrafficTargets(targets, `${targets.length} targets`, 'airplanes.live');
+        }
+
+        async function fetchJson(url) {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        async function fetchLiveTraffic() {
+            const [lat, lon] = RADAR_CENTER;
+            
+            // FIXED: Prepended public CORS proxy protocol wrapper to route OpenSky traffic natively inside client browsers
+            const feeds = [
+                { name: 'OpenSky', url: "https://corsproxy.io/?" + encodeURIComponent(`https://opensky-network.org/api/states/all?lamin=${RADAR_BBOX.minLat}&lomin=${RADAR_BBOX.minLon}&lamax=${RADAR_BBOX.maxLat}&lomax=${RADAR_BBOX.maxLon}`), parse: processOpenSkyTraffic },
+                { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${lat}/${lon}/${RADAR_RADIUS_NM}`, parse: processAdsbTraffic }
+            ];
+
+            let lastError = null;
+            for (const feed of feeds) {
+                try {
+                    const data = await fetchJson(feed.url);
+                    feed.parse(data);
+                    return; 
+                } catch (err) {
+                    lastError = err;
+                    console.warn(`${feed.name} trace failure:`, err.message);
+                }
+            }
+            
+            console.error("All data stream options connection attempts exhausted.");
+            setTrafficSource('failed');
+        }
+
+        function fetchRadarSweep() {
+            fetchLiveTraffic();
+        }
+
+        // Initialize Filter Slider Observers
+        document.getElementById('alt-filter-slider').addEventListener('input', function(e) {
+            const val = parseInt(e.target.value, 10);
+            document.getElementById('alt-filter-val').textContent = `FL${val.toString().padStart(3, '0')}`;
+            applyFiltering();
+        });
+
+        // Initialize Event Listeners for Simplified Hardware Source Switches
+        ['src-mlat', 'src-other'].forEach(id => {
+            document.getElementById(id).addEventListener('change', applyFiltering);
+        });
+
+        // UI Layer Visibility Selectors
+        const toggles = {
+            'layer-traffic': trafficGroup,
+            'layer-waypoints': waypointsGroup,
+            'layer-extensions': extensionsGroup,
+            'layer-holding': holdingGroup,
+            'layer-sid31l': sid31lGroup,
+            'layer-sid13l': sid13lGroup,
+            'layer-star31': star31Group,
+            'layer-star13': star13Group
+        };
+
+        Object.keys(toggles).forEach(id => {
+            const checkbox = document.getElementById(id);
+            if (checkbox && checkbox.checked) {
+                map.addLayer(toggles[id]);
+            } else if (checkbox && !checkbox.checked) {
+                map.removeLayer(toggles[id]);
+            }
+
+            if (checkbox) {
+                checkbox.addEventListener('change', function(e) {
+                    if (e.target.checked) {
+                        map.addLayer(toggles[id]);
+                    } else {
+                        map.removeLayer(toggles[id]);
+                    }
+                    if (id === 'layer-traffic') {
+                        applyFiltering();
+                    }
+                });
+            }
+        });
+
+        // Telephony Format Toggle Event Listener
+        document.getElementById('callsign-format-long').addEventListener('change', function(e) {
+            useLongCallsign = e.target.checked;
+        });
+
+        // Input Engine Hooks monitoring search field typing events (Real-time tracking of FIX labels)
+        document.getElementById('radar-search').addEventListener('input', function(e) {
+            const query = e.target.value.toUpperCase().trim();
+            
+            Object.keys(waypointMarkers).forEach(fixName => {
+                const marker = waypointMarkers[fixName];
+                if (query && fixName.includes(query)) {
+                    marker.setTooltipContent(`<span style="color: #FFFF00; font-weight: bold;">${fixName}</span>`);
+                } else {
+                    marker.setTooltipContent(fixName);
+                }
+            });
+        });
+
+        // Main Application Dynamic Bootstrapping Sequence
+        async function bootApp() {
+            await initAirlineDatabase(); 
+            fetchRadarSweep();          
+            setInterval(fetchRadarSweep, SWEEP_INTERVAL_MS); 
+        }
+
+        bootApp();
+    </script>
+</body>
+</html>
