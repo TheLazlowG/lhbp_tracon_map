@@ -8,22 +8,42 @@
         body { margin: 0; background-color: #000; overflow: hidden; }
         #radar-scope { width: 100vw; height: 100vh; background: #080808; }
         
+        /* Dynamic Zulu Clock Header Indicator */
+        .radar-clock-panel {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 8, 8, 0.4);
+            border: 0px solid rgba(255, 255, 255, 0.8);
+            padding: 6px 16px;
+            z-index: 1000;
+            font-family: 'Noto Sans Mono', monospace;
+            color: #8A8A8A;
+            font-size: 16px;
+            font-weight: normal;
+            letter-spacing: 0px;
+            border-radius: 2px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+        }
+
         /* Tactical Control Panel UI */
         .radar-ui-panel {
             position: absolute;
             top: 0px;
             right: 0px;
             background: rgba(8, 8, 8, 0.9);
-            border: 1px solid #ffffff;
+            border: 1px solid #8A8A8A;
             padding: 12px 16px;
             z-index: 1000;
             font-family: 'Noto Sans Mono', monospace;
-            color: #ffffff;
+            color: #8A8A8A;
             border-radius: 2px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             max-height: 90vh;
             overflow-y: auto;
-            width: 180px;
+            width: 150px;
         }
         .radar-ui-title {
             font-size: 11px;
@@ -66,7 +86,7 @@
         .radar-ui-control {
             display: flex;
             align-items: center;
-            margin: 6px 0;
+            margin: 4px 0;
             font-size: 11px;
             cursor: pointer;
             user-select: none;
@@ -147,6 +167,8 @@
     </style>
 </head>
 <body>
+    <div id="radar-clock" class="radar-clock-panel">00.00.0000 00:00:00Z</div>
+
     <div class="radar-ui-panel">
         <div class="radar-ui-title">Radar Search</div>
         <div class="radar-search-container">
@@ -174,7 +196,7 @@
             <input type="checkbox" id="src-mlat"> MLAT
         </label>
         <label class="radar-ui-control">
-            <input type="checkbox" id="src-other" checked> OTHER SOURCES
+            <input type="checkbox" id="src-other" checked> ADS-B
         </label>
 		
 		<div class="radar-ui-section">Map options</div>
@@ -184,8 +206,6 @@
         <label class="radar-ui-control">
             <input type="checkbox" id="layer-extensions" checked> RWY EXTENSIONS
         </label>
-
-        <div class="radar-ui-section">Airspace</div>
         <label class="radar-ui-control">
             <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
         </label>
@@ -212,18 +232,39 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // ==========================================
+        // Live Aviation Standard Zulu Clock Engine
+        // ==========================================
+        function updateRadarClock() {
+            const now = new Date();
+            
+            // Extract standard UTC definitions for absolute Zulu sync
+            const day = String(now.getUTCDate()).padStart(2, '0');
+            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+            const year = now.getUTCFullYear();
+            
+            const hours = String(now.getUTCHours()).padStart(2, '0');
+            const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+            
+            // Output layout formatted natively as YYYY-MM-DD HH:MM:SS Z
+            document.getElementById('radar-clock').textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}Z`;
+        }
+        setInterval(updateRadarClock, 1000);
+        updateRadarClock(); // Immediate calculation call on parse
+
+        // ==========================================
         // Telephony Translation Cache & Utilities
         // ==========================================
         const AIRLINE_TELEPHONY = {
             "RYR": "RYANAIR", "WZZ": "WIZZAIR", "WMT": "WIZZMALTA", "UTN": "UT-UKRAINE", "VJA": "ICONIC",
             "EJU": "EASY", "EZY": "EASY", "EZS": "EASY", "TKJ": "ANATOLIA", "HUA": "HUNGARY", 
-            "DLH": "LUFTHANSA","KLM": "KLM", "AFR": "AIR FRANCE", "BEL": "BEELINE",
-            "BAW": "SPEEDBIRD","THY": "TURKISH", "UAE": "EMIRATES", "MGH": "MAVI",
-            "QTR": "QATARI", "SWR": "SWISS", "AUA": "AUSTRIAN", "JSD": "ALPOK",
+            "DLH": "LUFTHANSA","KLM": "KLM", "AFR": "AIR FRANCE", "BEL": "BEELINE", "CSS": "SHUN FENG",
+            "BAW": "SPEEDBIRD","THY": "TURKISH", "UAE": "EMIRATES", "MGH": "MAVI", "HYT": "QUICK AIR",
+            "QTR": "QATARI", "SWR": "SWISS", "AUA": "AUSTRIAN", "JSD": "ALPOK", "FUU":"BLUE SPARROW",
             "FIN": "FINNAIR", "SAS": "SCANDINAVIAN","NOR": "NORSE", "NSZ": "REDNOSE",
-            "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC",
-            "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA",
-            "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN",
+            "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC", "AOJ":"ASTERIX",
+            "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST",
+            "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER",
             "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN",
             "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING",
             "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL"
@@ -255,7 +296,7 @@
         function getFormattedCallsign(callsign, useLongFormat) {
             if (!useLongFormat || !callsign) return callsign;
             
-            if (/^[A-Za-z]{5}$/.test(callsign.trim())) {
+            if (/^[A-Za-z]{5}/.test(callsign.trim())) { ///^[A-Za-z]{5}$/
                 return callsign;
             }
             
@@ -805,6 +846,9 @@
                     state.ui.leaderLine.setLatLngs([currentPos, leaderEnd]).setStyle({opacity: 0.5});
                     state.ui.dataBlock.setLatLng(leaderEnd);
 
+                    // Dynamic Altitude Prefix (LHBP Transition Altitude is 10,000 ft)
+                    const isBelowTA = interpAlt < 10000;
+                    const altPrefix = isBelowTA ? 'A' : 'F';
                     const flStr = Math.round(interpAlt / 100).toString().padStart(3, '0');
                     const spdStr = Math.round(interpSpd).toString().padStart(3, '0');
                     const labelCallsign = getFormattedCallsign(state.callsign, useLongFormat);
@@ -829,7 +873,7 @@
                     const acTypeColor   = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,0.5)';
 
                     const blockHTML = `<div style="color:${callsignColor}; font-weight:${isAircraftMatched ? 'bold' : 'normal'};">${labelCallsign}</div>` +
-                                      `<div style="color:${dataLineColor};">F${flStr}${trend} &nbsp;${spdStr}</div>` +
+                                      `<div style="color:${dataLineColor};">${altPrefix}${flStr}${trend} &nbsp;${spdStr}</div>` +
                                       `<div style="color:${acTypeColor};">${state.actype}</div>`;
                     
                     if (state.lastHTML !== blockHTML) {
@@ -919,7 +963,7 @@
         async function fetchLiveTraffic() {
             const [lat, lon] = RADAR_CENTER;
             
-            // FIXED: Prepended public CORS proxy protocol wrapper to route OpenSky traffic natively inside client browsers
+            // Public CORS proxy protocol wrapper to route OpenSky traffic natively inside client browsers
             const feeds = [
                 { name: 'OpenSky', url: "https://corsproxy.io/?" + encodeURIComponent(`https://opensky-network.org/api/states/all?lamin=${RADAR_BBOX.minLat}&lomin=${RADAR_BBOX.minLon}&lamax=${RADAR_BBOX.maxLat}&lomax=${RADAR_BBOX.maxLon}`), parse: processOpenSkyTraffic },
                 { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${lat}/${lon}/${RADAR_RADIUS_NM}`, parse: processAdsbTraffic }
