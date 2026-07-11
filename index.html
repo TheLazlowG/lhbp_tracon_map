@@ -257,14 +257,14 @@
         // ==========================================
         const AIRLINE_TELEPHONY = {
             "RYR": "RYANAIR", "WZZ": "WIZZAIR", "WMT": "WIZZMALTA", "UTN": "UT-UKRAINE", "VJA": "ICONIC",
-            "EJU": "EASY", "EZY": "EASY", "EZS": "EASY", "TKJ": "ANATOLIA", "HUA": "HUNGARY", 
+            "EJU": "ALPINE", "EZY": "EASY", "EZS": "TOPSWISS", "TKJ": "ANATOLIA", "HUA": "HUNGARY", 
             "DLH": "LUFTHANSA","KLM": "KLM", "AFR": "AIR FRANCE", "BEL": "BEELINE", "CSS": "SHUN FENG",
             "BAW": "SPEEDBIRD","THY": "TURKISH", "UAE": "EMIRATES", "MGH": "MAVI", "HYT": "QUICK AIR",
             "QTR": "QATARI", "SWR": "SWISS", "AUA": "AUSTRIAN", "JSD": "ALPOK", "FUU":"BLUE SPARROW",
             "FIN": "FINNAIR", "SAS": "SCANDINAVIAN","NOR": "NORSE", "NSZ": "REDNOSE",
             "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC", "AOJ":"ASTERIX",
-            "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST",
-            "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER",
+            "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST","HKC":"MASCOT",
+            "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER","LHX":"CITYAIR",
             "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN",
             "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING",
             "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL"
@@ -892,35 +892,6 @@
         }
         requestAnimationFrame(renderLoop);
 
-        function processOpenSkyTraffic(data) {
-            if (!data || !Array.isArray(data.states)) throw new Error('No state baseline data');
-            const targets = [];
-            data.states.forEach(flight => {
-                const icao24 = flight[0].trim();
-                const callsign = flight[1] ? flight[1].trim() : 'UNK';
-                const lon = flight[5], lat = flight[6], onGround = flight[8];
-                if (!lat || !lon || onGround || !inRadarBox(lat, lon)) return;
-                
-                // Maps OpenSky types down to clean MLAT vs OTHER definitions
-                let srcType = 'OTHER';
-                if (flight[16] === 3) srcType = 'MLAT';
-
-                targets.push({
-                    id: icao24,
-                    call: callsign !== "" ? callsign : "UNK",
-                    lat,
-                    lon,
-                    alt: flight[7] ? Math.round(flight[7] * 3.28084) : 0,
-                    spd: flight[9] ? Math.round(flight[9] * 1.94384) : 0,
-                    hdg: flight[10] || 0,
-                    type: "UNK",
-                    srcType: srcType
-                });
-            });
-            if (targets.length === 0) throw new Error('Zero targets inside bbox perimeter');
-            processTrafficTargets(targets, `${targets.length} targets`, 'opensky-network.org');
-        }
-
         function processAdsbTraffic(data) {
             if (!data || !Array.isArray(data.ac)) throw new Error('Empty dataset returned');
             const targets = [];
@@ -962,27 +933,15 @@
 
         async function fetchLiveTraffic() {
             const [lat, lon] = RADAR_CENTER;
-            
-            // Public CORS proxy protocol wrapper to route OpenSky traffic natively inside client browsers
-            const feeds = [
-                { name: 'OpenSky', url: "https://corsproxy.io/?" + encodeURIComponent(`https://opensky-network.org/api/states/all?lamin=${RADAR_BBOX.minLat}&lomin=${RADAR_BBOX.minLon}&lamax=${RADAR_BBOX.maxLat}&lomax=${RADAR_BBOX.maxLon}`), parse: processOpenSkyTraffic },
-                { name: 'airplanes.live', url: `https://api.airplanes.live/v2/point/${lat}/${lon}/${RADAR_RADIUS_NM}`, parse: processAdsbTraffic }
-            ];
+            const targetUrl = `https://api.airplanes.live/v2/point/${lat}/${lon}/${RADAR_RADIUS_NM}`;
 
-            let lastError = null;
-            for (const feed of feeds) {
-                try {
-                    const data = await fetchJson(feed.url);
-                    feed.parse(data);
-                    return; 
-                } catch (err) {
-                    lastError = err;
-                    console.warn(`${feed.name} trace failure:`, err.message);
-                }
+            try {
+                const data = await fetchJson(targetUrl);
+                processAdsbTraffic(data);
+            } catch (err) {
+                console.error("airplanes.live stream connection failure:", err.message);
+                setTrafficSource('failed');
             }
-            
-            console.error("All data stream options connection attempts exhausted.");
-            setTrafficSource('failed');
         }
 
         function fetchRadarSweep() {
