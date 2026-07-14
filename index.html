@@ -28,6 +28,29 @@
             pointer-events: none;
         }
 
+        /* METAR Report Panel */
+        .radar-metar-panel {
+            position: absolute;
+            top: 54px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 8, 8, 0.4);
+            padding: 4px 16px;
+            z-index: 1000;
+            font-family: 'Noto Sans Mono', monospace;
+            color: #5DEB3D;
+            font-size: 11px;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+            border-radius: 2px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            white-space: nowrap;
+            max-width: 90vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         /* Tactical Control Panel UI */
         .radar-ui-panel {
             position: absolute;
@@ -168,6 +191,7 @@
 </head>
 <body>
     <div id="radar-clock" class="radar-clock-panel">00.00.0000 00:00:00Z</div>
+    <div id="radar-metar" class="radar-metar-panel">METAR LHBP: LOADING...</div>
 
     <div class="radar-ui-panel">
         <div class="radar-ui-title">Radar Search</div>
@@ -253,6 +277,31 @@
         updateRadarClock(); // Immediate calculation call on parse
 
         // ==========================================
+        // Live METAR Report Engine (LHBP)
+        // ==========================================
+        const METAR_STATION = 'LHBP';
+        const METAR_REFRESH_MS = 5 * 60 * 1000; // refresh every 5 minutes
+
+        async function updateMetar() {
+            const metarEl = document.getElementById('radar-metar');
+            try {
+                const response = await fetch(`https://aviationweather.gov/api/data/metar?ids=${METAR_STATION}&format=raw`);
+                if (!response.ok) throw new Error('Network response not OK');
+                const text = (await response.text()).trim();
+
+                if (text) {
+                    metarEl.textContent = text;
+                } else {
+                    metarEl.textContent = `METAR ${METAR_STATION}: NO DATA`;
+                }
+            } catch (err) {
+                metarEl.textContent = `METAR ${METAR_STATION}: UNAVAILABLE`;
+            }
+        }
+        setInterval(updateMetar, METAR_REFRESH_MS);
+        updateMetar(); // Immediate fetch call on parse
+
+        // ==========================================
         // Telephony Translation Cache & Utilities
         // ==========================================
         const AIRLINE_TELEPHONY = {
@@ -265,7 +314,7 @@
             "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC", "AOJ":"ASTERIX",
             "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST","HKC":"MASCOT",
             "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER","LHX":"CITYAIR",
-            "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN",
+            "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN", "TOM":"TOMJET",
             "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING",
             "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL"
         };
