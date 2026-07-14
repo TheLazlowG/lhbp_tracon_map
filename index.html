@@ -64,9 +64,9 @@
             color: #8A8A8A;
             border-radius: 2px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            max-height: 90vh;
+            max-height: 95vh;
             overflow-y: auto;
-            width: 150px;
+            width: 160px;
         }
         .radar-ui-title {
             font-size: 11px;
@@ -139,6 +139,93 @@
             background: #222;
         }
 
+        /* ATC Audio Controls UI Custom Styles */
+        .atc-player-card {
+            background: #141414;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        .atc-feed-title {
+            font-size: 10px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Status LED Indicator Styles */
+        .atc-status-led {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #6c757d; /* Offline (Gray) */
+            margin-right: 6px;
+            flex-shrink: 0;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .atc-status-led.connecting {
+            background-color: #ffc107; /* Handshaking (Orange) */
+            box-shadow: 0 0 6px #ffc107;
+        }
+        .atc-status-led.connected {
+            background-color: #5DEB3D; /* Online (Green) */
+            box-shadow: 0 0 6px #5DEB3D;
+        }
+        .atc-status-led.error {
+            background-color: #dc3545; /* Interrupted (Red) */
+            box-shadow: 0 0 6px #dc3545;
+        }
+
+        .atc-btn {
+            background: #222;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #8A8A8A;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            cursor: pointer;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+        .atc-btn.playing {
+            background: #5DEB3D;
+            color: #000;
+            border-color: #5DEB3D;
+            font-weight: bold;
+        }
+        .atc-btn:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+        }
+        .atc-btn.playing:hover {
+            background: #4cd12d;
+            border-color: #4cd12d;
+            color: #000;
+        }
+        .atc-control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 9px;
+            margin: 4px 0;
+        }
+        .atc-control-row span {
+            width: 25px;
+        }
+        .atc-slider {
+            flex-grow: 1;
+            margin: 0 0 0 8px;
+            height: 4px;
+            accent-color: #8A8A8A;
+            background: #222;
+            cursor: pointer;
+        }
+
         /* Waypoint Alphanumeric Text Styling */
         .fix-label {
             color: #8A8A8A;
@@ -199,6 +286,55 @@
             <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
         </div>
 
+        <!-- ========================================== -->
+        <!-- ATC Radio Panel Controls -->
+        <!-- ========================================== -->
+        <div class="radar-ui-title">ATC Radio</div>
+        
+        <!-- LHBP Approach (122.980 MHz) -->
+        <div class="atc-player-card">
+            <div class="atc-feed-title">
+                <div style="display: flex; align-items: center;">
+                    <span class="atc-status-led" id="led-app"></span>
+                    <span>APP (122.98)</span>
+                </div>
+                <button id="btn-app" class="atc-btn">Play</button>
+            </div>
+            <div class="atc-control-row">
+                <span>VOL</span>
+                <input type="range" id="vol-app" class="atc-slider" min="0" max="1" step="0.05" value="0.8">
+            </div>
+            <div class="atc-control-row">
+                <span>BAL</span>
+                <input type="range" id="bal-app" class="atc-slider" min="-1" max="1" step="0.1" value="0">
+            </div>
+            <audio id="audio-app" crossorigin="anonymous" preload="none">
+                <source src="https://audio.liveatc.net/lhbp_app_122980" type="audio/mpeg">
+            </audio>
+        </div>
+
+        <!-- LHBP Tower (118.100 MHz) -->
+        <div class="atc-player-card">
+            <div class="atc-feed-title">
+                <div style="display: flex; align-items: center;">
+                    <span class="atc-status-led" id="led-twr"></span>
+                    <span>TWR (118.10)</span>
+                </div>
+                <button id="btn-twr" class="atc-btn">Play</button>
+            </div>
+            <div class="atc-control-row">
+                <span>VOL</span>
+                <input type="range" id="vol-twr" class="atc-slider" min="0" max="1" step="0.05" value="0.8">
+            </div>
+            <div class="atc-control-row">
+                <span>BAL</span>
+                <input type="range" id="bal-twr" class="atc-slider" min="-1" max="1" step="0.1" value="0">
+            </div>
+            <audio id="audio-twr" crossorigin="anonymous" preload="none">
+                <source src="https://audio.liveatc.net/lhbp_twr" type="audio/mpeg">
+            </audio>
+        </div>
+
         <div class="radar-ui-title">Scope Display</div>
         
         <label class="radar-ui-control">
@@ -256,6 +392,173 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // ==========================================
+        // Web Audio API & ATC Stream Control Setup
+        // ==========================================
+        let audioCtx = null;
+        const feeds = {
+            app: {
+                audioId: 'audio-app',
+                btnId: 'btn-app',
+                volId: 'vol-app',
+                balId: 'bal-app',
+                ledId: 'led-app',
+                source: null,
+                gainNode: null,
+                pannerNode: null,
+                isPlaying: false
+            },
+            twr: {
+                audioId: 'audio-twr',
+                btnId: 'btn-twr',
+                volId: 'vol-twr',
+                balId: 'bal-twr',
+                ledId: 'led-twr',
+                source: null,
+                gainNode: null,
+                pannerNode: null,
+                isPlaying: false
+            }
+        };
+
+        function initAudioEngine(feedKey) {
+            if (!audioCtx) {
+                // Initialize modern audio context on first user interaction
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const feed = feeds[feedKey];
+            const audioElement = document.getElementById(feed.audioId);
+
+            if (!feed.source) {
+                // Route the audio element into the Web Audio graph
+                feed.source = audioCtx.createMediaElementSource(audioElement);
+                feed.gainNode = audioCtx.createGain();
+                
+                // Create balance/panning node (requires StereoPannerNode)
+                if (audioCtx.createStereoPanner) {
+                    feed.pannerNode = audioCtx.createStereoPanner();
+                } else {
+                    // Fallback configuration if older browser environment
+                    feed.pannerNode = audioCtx.createPanner();
+                    feed.pannerNode.panningModel = 'HRTF';
+                }
+
+                // Connect nodes: Source -> Gain -> Panner -> Output Speakers
+                feed.source.connect(feed.gainNode);
+                feed.gainNode.connect(feed.pannerNode);
+                feed.pannerNode.connect(audioCtx.destination);
+
+                // Attach slider change listeners
+                document.getElementById(feed.volId).addEventListener('input', (e) => {
+                    if (feed.gainNode) {
+                        feed.gainNode.gain.value = parseFloat(e.target.value);
+                    }
+                });
+
+                document.getElementById(feed.balId).addEventListener('input', (e) => {
+                    if (feed.pannerNode) {
+                        if (feed.pannerNode.pan) {
+                            feed.pannerNode.pan.value = parseFloat(e.target.value);
+                        } else {
+                            // Legacy fallback coordinates panner orientation
+                            const panVal = parseFloat(e.target.value);
+                            feed.pannerNode.setPosition(panVal, 0, 1 - Math.abs(panVal));
+                        }
+                    }
+                });
+
+                // Attach Status LED Observers via native HTML5 Audio element events
+                setupStatusLED(audioElement, feed.ledId);
+            }
+
+            // Set initial parameters safely
+            feed.gainNode.gain.value = parseFloat(document.getElementById(feed.volId).value);
+            if (feed.pannerNode.pan) {
+                feed.pannerNode.pan.value = parseFloat(document.getElementById(feed.balId).value);
+            }
+        }
+
+        function setupStatusLED(audioElement, ledId) {
+            const led = document.getElementById(ledId);
+            if (!led) return;
+
+            const setStatus = (statusClass) => {
+                led.classList.remove('connecting', 'connected', 'error');
+                if (statusClass) {
+                    led.classList.add(statusClass);
+                }
+            };
+
+            // Connecting / Handshaking / Awaiting network buffer
+            audioElement.addEventListener('loadstart', () => {
+                setStatus('connecting');
+            });
+            audioElement.addEventListener('waiting', () => {
+                setStatus('connecting');
+            });
+
+            // Connected / Streaming active
+            audioElement.addEventListener('playing', () => {
+                setStatus('connected');
+            });
+
+            // Stream pipeline error / dropped sockets (e.g., ERR_CONNECTION_CLOSED)
+            audioElement.addEventListener('error', () => {
+                setStatus('error');
+            });
+
+            // Manual disconnection or stopping resets indicator to idle (neutral gray)
+            audioElement.addEventListener('pause', () => {
+                setStatus(null);
+            });
+            audioElement.addEventListener('emptied', () => {
+                setStatus(null);
+            });
+        }
+
+        function toggleFeed(feedKey) {
+            const feed = feeds[feedKey];
+            const btn = document.getElementById(feed.btnId);
+            const audioElement = document.getElementById(feed.audioId);
+
+            initAudioEngine(feedKey);
+
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (!feed.isPlaying) {
+                // Live streams must reload source before playing to avoid delay buffers
+                audioElement.load(); 
+                audioElement.play()
+                    .then(() => {
+                        feed.isPlaying = true;
+                        btn.textContent = 'Stop';
+                        btn.classList.add('playing');
+                    })
+                    .catch(err => {
+                        console.error("Audio playback interrupted:", err);
+                        // Explicitly trigger status error representation on play failure
+                        const led = document.getElementById(feed.ledId);
+                        if (led) {
+                            led.classList.remove('connecting', 'connected');
+                            led.classList.add('error');
+                        }
+                    });
+            } else {
+                audioElement.pause();
+                feed.isPlaying = false;
+                btn.textContent = 'Play';
+                btn.classList.remove('playing');
+            }
+        }
+
+        // Setup Player Click Listeners
+        document.getElementById('btn-app').addEventListener('click', () => toggleFeed('app'));
+        document.getElementById('btn-twr').addEventListener('click', () => toggleFeed('twr'));
+
+
+        // ==========================================
         // Live Aviation Standard Zulu Clock Engine
         // ==========================================
         function updateRadarClock() {
@@ -287,8 +590,8 @@
             try {
                 const targetUrl = `https://aviationweather.gov/api/data/metar?ids=${METAR_STATION}&format=raw`;
                 
-                // FIXED: Explicitly use '?url=' before the encoded address
-                const response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`);
+                // Fetching via AllOrigins which doesn't block local file:// origins
+                const response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
                 
                 if (!response.ok) throw new Error('Network response not OK');
                 const text = (await response.text()).trim();
@@ -320,7 +623,7 @@
             "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST","HKC":"MASCOT",
             "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER","LHX":"CITYAIR",
             "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN", "TOM":"TOMJET",
-            "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING",
+            "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING","BBG":"BLUE BIRD",
             "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL"
         };
 
