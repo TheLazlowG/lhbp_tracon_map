@@ -276,23 +276,35 @@
         setInterval(updateRadarClock, 1000);
         updateRadarClock(); // Immediate calculation call on parse
 
-        // ==========================================
+		// ==========================================
         // Live METAR Report Engine (LHBP)
         // ==========================================
         const METAR_STATION = 'LHBP';
         const METAR_REFRESH_MS = 5 * 60 * 1000; // refresh every 5 minutes
-
+ 
         async function updateMetar() {
             const metarEl = document.getElementById('radar-metar');
+            // aviationweather.gov does not send CORS headers, so browser-side fetches
+            // are blocked when this page isn't served from aviationweather.gov itself.
+            // Route through a CORS proxy that mirrors the raw response with an
+            // Access-Control-Allow-Origin header attached.
+            //
+            // Both the proxy AND aviationweather.gov itself can cache responses,
+            // so a plain URL will keep returning the same saved copy for many
+            // minutes. Appending a changing "cache-buster" query param to the
+            // *target* URL forces every hop to treat this as a brand new request.
+            const cacheBuster = Date.now();
+            const targetUrl = `https://aviationweather.gov/api/data/metar?ids=${METAR_STATION}&format=raw&_=${cacheBuster}`;
+            const proxiedUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+ 
             try {
-                const targetUrl = `https://aviationweather.gov/api/data/metar?ids=${METAR_STATION}&format=raw`;
-                
-                // FIXED: Explicitly use '?url=' before the encoded address
-                const response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`);
-                
+                const response = await fetch(proxiedUrl, {
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
                 if (!response.ok) throw new Error('Network response not OK');
                 const text = (await response.text()).trim();
-
+ 
                 if (text) {
                     metarEl.textContent = text;
                 } else {
@@ -319,9 +331,9 @@
             "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC", "AOJ":"ASTERIX",
             "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST","HKC":"MASCOT",
             "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER","LHX":"CITYAIR",
-            "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN", "TOM":"TOMJET",
+            "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN", "TOM":"TOMJET","BRK":"BARTOK",
             "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING","BBG":"BLUE BIRD",
-            "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL"
+            "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL","BCS":"POSTMAN"
         };
 
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
