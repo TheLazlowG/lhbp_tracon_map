@@ -187,6 +187,9 @@
             height: 4px;
             transform: translate(-50%, -50%);
         }
+        .atc-target-icon.selected {
+            box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
+        }
     </style>
 </head>
 <body>
@@ -748,6 +751,122 @@
                    lon >= RADAR_BBOX.minLon && lon <= RADAR_BBOX.maxLon;
         }
 
+        // ==========================================
+        // 8b. Track History Selection
+        // ==========================================
+        let selectedAircraftId = null;
+        const trackHistoryLine = L.polyline([], {
+            color: '#5DEB3D',
+            weight: 1.5,
+            opacity: 0.85,
+            interactive: false,
+            lineJoin: 'round'
+        });
+
+        // Pulls the full retained trace from airplanes.live's globe backend (the same
+        // JSON file their own web globe uses to draw history when you click a plane).
+        // This is NOT part of the documented airplanes.live REST API, so it's fetched
+        // best-effort with a CORS-proxy fallback and silently ignored on failure --
+        // the line still works from session-only data if this can't be reached.
+        async function fetchAircraftHistory(hex) {
+            const cleanHex = hex.replace('~', '').toLowerCase().padStart(6, '0');
+            const chunk = cleanHex.slice(-2);
+            const targetUrl = `https://globe.airplanes.live/data/traces/${chunk}/trace_full_${cleanHex}.json`;
+
+            async function tryFetch(url) {
+                const res = await fetch(url, { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            }
+
+            try {
+                return await tryFetch(targetUrl);
+            } catch (err) {
+                try {
+                    const proxied = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl + '?_=' + Date.now())}`;
+                    return await tryFetch(proxied);
+                } catch (err2) {
+                    console.warn(`Track history unavailable for ${hex} (session-only track will be used):`, err2.message);
+                    return null;
+                }
+            }
+        }
+
+        // Trims the trace down to just the most recent leg (i.e. since last takeoff)
+        // using readsb's "start of new leg" flag (bit 2 of the flags field).
+        function extractPointsSinceLastTakeoff(data) {
+            if (!data || !Array.isArray(data.trace)) return [];
+            const trace = data.trace;
+            let legStartIdx = 0;
+            for (let i = 0; i < trace.length; i++) {
+                const flags = trace[i][6];
+                if (typeof flags === 'number' && (flags & 2)) legStartIdx = i;
+            }
+            const points = [];
+            for (let i = legStartIdx; i < trace.length; i++) {
+                const lat = trace[i][1];
+                const lon = trace[i][2];
+                if (typeof lat === 'number' && typeof lon === 'number') points.push([lat, lon]);
+            }
+            return points;
+        }
+
+        function updateTrackHistoryLine() {
+            const state = selectedAircraftId ? aircraftState[selectedAircraftId] : null;
+            if (!state) {
+                if (map.hasLayer(trackHistoryLine)) map.removeLayer(trackHistoryLine);
+                trackHistoryLine.setLatLngs([]);
+                return;
+            }
+
+            const currentPos = state.ui.marker.getLatLng();
+            const points = [
+                ...(state.historicalTrack || []),
+                ...state.trackHistory,
+                ...(currentPos ? [[currentPos.lat, currentPos.lng]] : [])
+            ];
+
+            trackHistoryLine.setLatLngs(points);
+            if (!map.hasLayer(trackHistoryLine)) trackHistoryLine.addTo(map);
+        }
+
+        function selectAircraft(id) {
+            // Clear previous selection's highlight
+            if (selectedAircraftId && aircraftState[selectedAircraftId]) {
+                const prevIcon = aircraftState[selectedAircraftId].ui.marker.getElement();
+                if (prevIcon) prevIcon.classList.remove('selected');
+            }
+
+            selectedAircraftId = (selectedAircraftId === id) ? null : id;
+
+            if (selectedAircraftId && aircraftState[selectedAircraftId]) {
+                const state = aircraftState[selectedAircraftId];
+                const icon = state.ui.marker.getElement();
+                if (icon) icon.classList.add('selected');
+
+                // Fetch the extended pre-session history once per aircraft selection
+                if (!state.historyFetchAttempted) {
+                    state.historyFetchAttempted = true;
+                    fetchAircraftHistory(state.id).then(data => {
+                        // Bail if the user selected something else while this was in flight
+                        if (selectedAircraftId !== id || !aircraftState[id]) return;
+                        const histPoints = extractPointsSinceLastTakeoff(data);
+                        if (histPoints.length) {
+                            aircraftState[id].historicalTrack = histPoints;
+                            updateTrackHistoryLine();
+                        }
+                    });
+                }
+            }
+
+            updateTrackHistoryLine();
+        }
+
+        // Clicking empty map space deselects the current track
+        map.on('click', function() {
+            if (selectedAircraftId) selectAircraft(selectedAircraftId);
+        });
+
         function initAircraftState(id, callsign, srcType) {
             aircraftState[id] = {
                 id: id,
@@ -757,9 +876,11 @@
                 srcType: srcType || "OTHER",
                 telemetry: [],
                 historyDots: [],
+                trackHistory: [],
                 featureGroup: L.featureGroup().addTo(trafficGroup),
                 ui: {
-                    marker: L.marker([0, 0], { icon: targetDivIcon, interactive: false, opacity: 0 }),
+                    marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0 }),
+                    hitArea: L.circleMarker([0, 0], { radius: 9, opacity: 0, fillOpacity: 0, interactive: true, bubblingMouseEvents: false }),
                     speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.2, opacity: 0, interactive: false }),
                     leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1, opacity: 0, interactive: false }),
                     dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0 })
@@ -768,9 +889,19 @@
             };
             const ui = aircraftState[id].ui;
             ui.marker.addTo(aircraftState[id].featureGroup);
+            ui.hitArea.addTo(aircraftState[id].featureGroup);
             ui.speedLine.addTo(aircraftState[id].featureGroup);
             ui.leaderLine.addTo(aircraftState[id].featureGroup);
             ui.dataBlock.addTo(aircraftState[id].featureGroup);
+
+            ui.hitArea.on('click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                selectAircraft(id);
+            });
+            ui.marker.on('click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                selectAircraft(id);
+            });
         }
 
         function processTrafficTargets(targets, sourceLabel, siteDomain) {
@@ -793,6 +924,11 @@
                     state.telemetry.push({ time: now, lat: t.lat, lon: t.lon, alt: t.alt, spd: t.spd, hdg: t.hdg });
                     if (state.telemetry.length > 4) state.telemetry.shift();
 
+                    // Full-session track (since this aircraft first appeared on radar, i.e.
+                    // effectively since its last takeoff for departures). Intentionally
+                    // uncapped so the selected-aircraft track line can span the whole session.
+                    state.trackHistory.push([t.lat, t.lon]);
+
                     const dot = L.circleMarker([t.lat, t.lon], { radius: 1, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false }).addTo(state.featureGroup);
                     state.historyDots.push(dot);
                     if (state.historyDots.length > HISTORY_LENGTH) {
@@ -806,6 +942,10 @@
                 if (!activeIds.has(id)) {
                     if (trafficGroup.hasLayer(aircraftState[id].featureGroup)) {
                         trafficGroup.removeLayer(aircraftState[id].featureGroup);
+                    }
+                    if (id === selectedAircraftId) {
+                        selectedAircraftId = null;
+                        updateTrackHistoryLine();
                     }
                     delete aircraftState[id];
                 }
@@ -902,6 +1042,7 @@
 
                 const currentPos = [interpLat, interpLon];
                 state.ui.marker.setLatLng(currentPos).setOpacity(1);
+                state.ui.hitArea.setLatLng(currentPos);
 
                 if (interpSpd > 30) {
                     const distanceNM = (interpSpd / 60) * PREDICT_MINUTES;
@@ -953,6 +1094,8 @@
                     state.ui.dataBlock.setOpacity(0);
                 }
             });
+
+            if (selectedAircraftId) updateTrackHistoryLine();
 
             requestAnimationFrame(renderLoop);
         }
