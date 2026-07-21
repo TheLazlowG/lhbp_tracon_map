@@ -51,22 +51,60 @@
             text-overflow: ellipsis;
         }
 
-        /* Tactical Control Panel UI */
-        .radar-ui-panel {
+        /* Tactical Control Panel Wrapper (Sliding Container) */
+        .radar-ui-wrapper {
             position: absolute;
             top: 0px;
             right: 0px;
+            z-index: 1000;
+            display: flex;
+            align-items: flex-start;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0); /* Fully open by default */
+        }
+
+        /* Slide panel off-screen while preserving button width */
+        .radar-ui-wrapper.collapsed {
+            transform: translateX(calc(100% - 28px));
+        }
+
+        /* Collapsible Toggle Button pinned to Top-Left of Panel */
+        .radar-ui-toggle-btn {
+            background: rgba(8, 8, 8, 0.9);
+            border: 1px solid #8A8A8A;
+            border-right: none;
+            color: #5DEB3D;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            width: 28px;
+            height: 32px;
+            line-height: 30px;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 2px 0 0 2px;
+            box-shadow: -2px 4px 8px rgba(0, 0, 0, 0.5);
+            margin-top: 10px;
+        }
+        .radar-ui-toggle-btn:hover {
+            color: #ffffff;
+            background: rgba(20, 20, 20, 0.95);
+        }
+
+        /* Tactical Control Panel UI */
+        .radar-ui-panel {
             background: rgba(8, 8, 8, 0.9);
             border: 1px solid #8A8A8A;
             padding: 12px 16px;
-            z-index: 1000;
             font-family: 'Noto Sans Mono', monospace;
             color: #8A8A8A;
-            border-radius: 2px;
+            border-radius: 0 0 0 2px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             max-height: 90vh;
             overflow-y: auto;
             width: 150px;
+            box-sizing: content-box;
         }
         .radar-ui-title {
             font-size: 11px;
@@ -155,7 +193,7 @@
             color: #5DEB3D;
             font-family: 'Noto Sans Mono', monospace;
             font-size: 12px;
-			font-weight: normal;
+            font-weight: normal;
             text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
             background: transparent !important;
             border: none !important;
@@ -196,81 +234,99 @@
     <div id="radar-clock" class="radar-clock-panel">00.00.0000 00:00:00Z</div>
     <div id="radar-metar" class="radar-metar-panel">METAR LHBP: LOADING...</div>
 
-    <div class="radar-ui-panel">
-        <div class="radar-ui-title">Radar Search</div>
-        <div class="radar-search-container">
-            <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
+    <div class="radar-ui-wrapper" id="radar-ui-wrapper">
+        <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
+        <div class="radar-ui-panel">
+            <div class="radar-ui-title">Radar Search</div>
+            <div class="radar-search-container">
+                <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
+            </div>
+
+            <div class="radar-ui-title">Scope Display</div>
+            
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-traffic" checked> AIR TRAFFIC
+            </label>
+            
+            <label class="radar-ui-control">
+                <input type="checkbox" id="callsign-format-long" checked> TELEPHONY CALLSIGNS
+            </label>
+            
+            <div class="radar-slider-container">
+                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Max Altitude</div>
+                <div class="radar-slider-output" id="alt-filter-val">FL250</div>
+                <input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250">
+            </div>
+
+            <div class="radar-ui-section">ACFT Data Source</div>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="src-mlat"> MLAT
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="src-other" checked> ADS-B
+            </label>
+            
+            <div class="radar-ui-section">Map options</div>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="map-labels" checked> MAP LABELS
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-extensions" checked> RWY EXTENSIONS
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
+            </label>
+
+            <div class="radar-ui-section">Weather</div>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-rain"> PRECIP RADAR
+            </label>
+            <div class="radar-slider-container" id="rain-opacity-container" style="display:none;">
+                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Radar Opacity</div>
+                <div class="radar-slider-output" id="rain-opacity-val">70%</div>
+                <input type="range" id="rain-opacity-slider" class="radar-ui-slider" min="10" max="100" step="10" value="70">
+            </div>
+
+            <div class="radar-ui-section">Departures</div>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-sid31l"> SID 31L
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-sid13l"> SID 13L
+            </label>
+
+            <div class="radar-ui-section">Arrivals</div>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-star31" checked> STAR 31L/31R
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-star13"> STAR 13L/13R
+            </label>
         </div>
-
-        <div class="radar-ui-title">Scope Display</div>
-        
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-traffic" checked> AIR TRAFFIC
-        </label>
-        
-        <label class="radar-ui-control">
-            <input type="checkbox" id="callsign-format-long" checked> TELEPHONY CALLSIGNS
-        </label>
-        
-        <div class="radar-slider-container">
-            <div class="radar-ui-section" style="margin: 0 0 2px 0;">Max Altitude</div>
-            <div class="radar-slider-output" id="alt-filter-val">FL250</div>
-            <input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250">
-        </div>
-
-        <div class="radar-ui-section">ACFT Data Source</div>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="src-mlat"> MLAT
-        </label>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="src-other" checked> ADS-B
-        </label>
-		
-		<div class="radar-ui-section">Map options</div>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="map-labels" checked> MAP LABELS
-        </label>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
-        </label>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-extensions" checked> RWY EXTENSIONS
-        </label>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
-        </label>
-
-        <div class="radar-ui-section">Weather</div>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-rain"> PRECIP RADAR
-        </label>
-        <div class="radar-slider-container" id="rain-opacity-container" style="display:none;">
-            <div class="radar-ui-section" style="margin: 0 0 2px 0;">Radar Opacity</div>
-            <div class="radar-slider-output" id="rain-opacity-val">70%</div>
-            <input type="range" id="rain-opacity-slider" class="radar-ui-slider" min="10" max="100" step="10" value="70">
-        </div>
-
-        <div class="radar-ui-section">Departures</div>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-sid31l"> SID 31L
-        </label>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-sid13l"> SID 13L
-        </label>
-
-        <div class="radar-ui-section">Arrivals</div>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-star31"> STAR 31L/31R
-        </label>
-        <label class="radar-ui-control">
-            <input type="checkbox" id="layer-star13"> STAR 13L/13R
-        </label>
     </div>
 
     <div id="radar-scope"></div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
+        // ==========================================
+        // UI Collapsible Panel Controller
+        // ==========================================
+        const uiWrapper = document.getElementById('radar-ui-wrapper');
+        const uiToggleBtn = document.getElementById('radar-ui-toggle');
+
+        uiToggleBtn.addEventListener('click', function() {
+            uiWrapper.classList.toggle('collapsed');
+            if (uiWrapper.classList.contains('collapsed')) {
+                uiToggleBtn.textContent = '<';
+            } else {
+                uiToggleBtn.textContent = '>';
+            }
+        });
+
         // ==========================================
         // Live Aviation Standard Zulu Clock Engine
         // ==========================================
@@ -292,7 +348,7 @@
         setInterval(updateRadarClock, 1000);
         updateRadarClock(); // Immediate calculation call on parse
 
-		// ==========================================
+        // ==========================================
         // Live METAR Report Engine (LHBP)
         // ==========================================
         const METAR_STATION = 'LHBP';
@@ -300,15 +356,6 @@
  
         async function updateMetar() {
             const metarEl = document.getElementById('radar-metar');
-            // aviationweather.gov does not send CORS headers, so browser-side fetches
-            // are blocked when this page isn't served from aviationweather.gov itself.
-            // Route through a CORS proxy that mirrors the raw response with an
-            // Access-Control-Allow-Origin header attached.
-            //
-            // Both the proxy AND aviationweather.gov itself can cache responses,
-            // so a plain URL will keep returning the same saved copy for many
-            // minutes. Appending a changing "cache-buster" query param to the
-            // *target* URL forces every hop to treat this as a brand new request.
             const cacheBuster = Date.now();
             const targetUrl = `https://aviationweather.gov/api/data/metar?ids=${METAR_STATION}&format=raw&_=${cacheBuster}`;
             const proxiedUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
@@ -378,7 +425,7 @@
         function getFormattedCallsign(callsign, useLongFormat) {
             if (!useLongFormat || !callsign) return callsign;
             
-            if (/^[A-Za-z]{5}/.test(callsign.trim())) { ///^[A-Za-z]{5}$/
+            if (/^[A-Za-z]{5}/.test(callsign.trim())) {
                 return callsign;
             }
             
@@ -419,10 +466,7 @@
         // ==========================================
         // RainViewer Precipitation Radar Overlay
         // ==========================================
-        // RainViewer only serves radar tiles up to zoom 7 natively. maxNativeZoom
-        // tells Leaflet to keep requesting z7 tiles and upscale/stretch them for
-        // any deeper zoom the scope is set to, rather than the layer vanishing.
-        const RAIN_REFRESH_MS = 2 * 60 * 1000; // RainViewer publishes new frames every ~10 min, poll every 2 min
+        const RAIN_REFRESH_MS = 2 * 60 * 1000;
         let rainLayer = null;
         let rainOpacity = 0.7;
 
@@ -431,7 +475,7 @@
                 maxNativeZoom: 7,
                 maxZoom: 18,
                 opacity: rainOpacity,
-                zIndex: 450, // above basemap, below traffic/labels which are added later
+                zIndex: 450,
                 attribution: 'Radar &copy; RainViewer'
             });
         }
@@ -451,7 +495,6 @@
                 const latestFrame = frames[frames.length - 1];
                 const newLayer = buildRainLayer(latestFrame.path);
 
-                // Swap layers only once the new tiles are ready, so the overlay never flickers blank
                 newLayer.addTo(map);
                 if (rainLayer) {
                     newLayer.once('load', () => {
@@ -496,125 +539,46 @@
 
         // 3. Complete Master Waypoints
         const waypoints = {
-            "ABONY": [47.19083, 20.01056],
-            "ALZUR": [47.74256, 18.95719], 
-            "ANEXA": [47.85470, 18.48610],
-            "ARFOX": [47.97440, 18.57420],
-            "ATICO": [47.22286, 19.40292],
-            "BADOV": [48.02111, 18.81583],
-            "BEREV": [47.40414, 19.50589],
-            "BETED": [48.08330, 20.23330],
-            "BP328": [47.32186, 19.39489],
-            "BP329": [47.36364, 19.45117],
-            "BP331": [47.37586, 19.36978],
-            "BP701": [47.38831, 19.38439],
-            "BP702": [47.58806, 19.71853],
-            "BP703": [47.78847, 19.39597],
-            "BP704": [47.96808, 19.10353],
-            "BP705": [47.93822, 19.60047],
-            "BP711": [47.36628, 19.35417],
-            "BP712": [47.19042, 19.01619],
-            "BP723": [47.25497, 18.89439],
-            "BP733": [47.30597, 19.01456],
-            "BP734": [47.37361, 18.90436],
-            "BP735": [47.45461, 18.77225],
-            "BP736": [47.59628, 18.53928],
-            "BP741": [47.10417, 19.59164],
-            "BP742": [47.21558, 19.41389],
-            "BP743": [47.39200, 19.12992],
-            "BP744": [47.45889, 19.02144],
-            "BP753": [47.40472, 19.29186],
-            "BP754": [47.55436, 19.04922],
-            "BP755": [47.60383, 18.96917],
-            "BP756": [47.67106, 18.85975],
-            "BP763": [47.40142, 19.32861],
-            "BP764": [47.54942, 19.08886],
-            "BP765": [47.61431, 18.98308],
-            "BP766": [47.68133, 18.87336],
-            "BP772": [47.34906, 19.59414],
-            "BP774": [47.59264, 19.20158],
-            "BP783": [47.61136, 19.42658],
-            "BP784": [47.67847, 19.31814],
-            "BP785": [47.76111, 19.18028],
-            "BP786": [47.88178, 18.98692],
-            "BP801": [47.47853, 19.17244],
-            "BP802": [47.65342, 18.95778],
-            "BP803": [47.80253, 19.16431],
-            "BP811": [47.70369, 19.32033],
-            "BP812": [47.81747, 19.47942],
-            "BP813": [48.08153, 19.55533],
-            "BP821": [47.33642, 18.98847],
-            "BP822": [47.09994, 18.82711],
-            "BP834": [47.19161, 19.01328],
-            "BP835": [47.07417, 19.20394],
-            "BP836": [47.00936, 19.30858],
-            "BP837": [46.94203, 19.41686],
-            "BP840": [47.68922, 18.64422],
-            "BP841": [47.60203, 18.78772],
-            "BP842": [47.51908, 18.92350],
-            "BP843": [47.43536, 19.05992],
-            "BP844": [47.34106, 19.21269],
-            "BP854": [47.35983, 19.36419],
-            "BP855": [47.28428, 19.48556],
-            "BP856": [47.21667, 19.59369],
-            "BP863": [47.46694, 19.22272],
-            "BP864": [47.35114, 19.40956],
-            "BP865": [47.29486, 19.49986],
-            "BP866": [47.22725, 19.60797],
-            "BP870": [47.82369, 18.82367],
-            "BP871": [47.70031, 19.02617],
-            "BP872": [47.59072, 19.20467],
-            "BP874": [47.44536, 19.43964],
-            "BP883": [47.63419, 19.45767],
-            "BP884": [47.55361, 19.59056],
-            "BP885": [47.46686, 19.73292],
-            "CATUZ": [47.67583, 19.06614],
-            "DUZLA": [46.95694, 18.73028],
-            "EBAMO": [46.83220, 19.59250],
-            "ECMAN": [47.54208, 18.88594],
-            "EDEMU": [48.17440, 19.80830],
-            "ERGOM": [47.79444, 18.74111],
-            "FAHAZ": [46.88861, 19.04861],
-            "FERER": [47.63694, 19.57194],
-            "FUTNA": [47.15228, 19.69622],
-            "GAZDA": [46.80528, 19.39694],
-            "GELSA": [47.01389, 19.78917],
-            "GIFRA": [47.74656, 18.76619],
-            "GILEP": [47.48339, 18.25878],
-            "HUZTA": [47.60817, 18.77761], 
-            "JOZEP": [47.18917, 18.74028], 
-            "KATLI": [47.11861, 18.75167],
-            "KENES": [47.04583, 18.39778],
-            "KERET": [47.69750, 18.44194],
-            "KEZAL": [47.15360, 20.23140],
-            "LAHOR": [47.83167, 19.72806], 
-            "LITKU": [48.23053, 19.59853],
-            "LUCLA": [47.69619, 19.54222],
-            "MAMOR": [47.53389, 19.98972],
-            "MEZOS": [47.28861, 18.42306],
-            "NARKA": [47.83917, 19.82500],
-            "NICRA": [47.35619, 19.58272],
-            "OCRIT": [47.33503, 19.94539],
-            "ODVAS": [47.27083, 19.32631],
-            "OFENA": [47.16278, 19.71058],
-            "PUCOG": [47.41561, 18.59189],
-            "PUSTA": [47.45667, 18.17222],
-            "RW13L": [47.44542, 19.25756],
-            "RW13R": [47.44869, 19.22075],
-            "RW31L": [47.43047, 19.25025],
-            "RW31R": [47.42294, 19.29386],
-            "SOROS": [47.84278, 19.32611],
-            "TORAZ": [47.73603, 18.75164],
-            "TPS":   [47.49325, 19.44622], 
-            "ULPAX": [47.52561, 19.31019],
-            "ULZAK": [46.99420, 18.56690],
-            "UTCON": [47.28850, 19.69083], 
-            "VAJDI": [47.37560, 18.28580],
-            "VALVO": [47.60694, 19.69167],
-            "VETIK": [47.35278, 20.23250],
-            "WITRI": [48.14833, 20.12000],
-            "WONTA": [47.15533, 19.51103], 
-            "ZURFA": [47.39778, 19.84583]
+            "ABONY": [47.19083, 20.01056], "ALZUR": [47.74256, 18.95719], "ANEXA": [47.85470, 18.48610],
+            "ARFOX": [47.97440, 18.57420], "ATICO": [47.22286, 19.40292], "BADOV": [48.02111, 18.81583],
+            "BEREV": [47.40414, 19.50589], "BETED": [48.08330, 20.23330], "BP328": [47.32186, 19.39489],
+            "BP329": [47.36364, 19.45117], "BP331": [47.37586, 19.36978], "BP701": [47.38831, 19.38439],
+            "BP702": [47.58806, 19.71853], "BP703": [47.78847, 19.39597], "BP704": [47.96808, 19.10353],
+            "BP705": [47.93822, 19.60047], "BP711": [47.36628, 19.35417], "BP712": [47.19042, 19.01619],
+            "BP723": [47.25497, 18.89439], "BP733": [47.30597, 19.01456], "BP734": [47.37361, 18.90436],
+            "BP735": [47.45461, 18.77225], "BP736": [47.59628, 18.53928], "BP741": [47.10417, 19.59164],
+            "BP742": [47.21558, 19.41389], "BP743": [47.39200, 19.12992], "BP744": [47.45889, 19.02144],
+            "BP753": [47.40472, 19.29186], "BP754": [47.55436, 19.04922], "BP755": [47.60383, 18.96917],
+            "BP756": [47.67106, 18.85975], "BP763": [47.40142, 19.32861], "BP764": [47.54942, 19.08886],
+            "BP765": [47.61431, 18.98308], "BP766": [47.68133, 18.87336], "BP772": [47.34906, 19.59414],
+            "BP774": [47.59264, 19.20158], "BP783": [47.61136, 19.42658], "BP784": [47.67847, 19.31814],
+            "BP785": [47.76111, 19.18028], "BP786": [47.88178, 18.98692], "BP801": [47.47853, 19.17244],
+            "BP802": [47.65342, 18.95778], "BP803": [47.80253, 19.16431], "BP811": [47.70369, 19.32033],
+            "BP812": [47.81747, 19.47942], "BP813": [48.08153, 19.55533], "BP821": [47.33642, 18.98847],
+            "BP822": [47.09994, 18.82711], "BP834": [47.19161, 19.01328], "BP835": [47.07417, 19.20394],
+            "BP836": [47.00936, 19.30858], "BP837": [46.94203, 19.41686], "BP840": [47.68922, 18.64422],
+            "BP841": [47.60203, 18.78772], "BP842": [47.51908, 18.92350], "BP843": [47.43536, 19.05992],
+            "BP844": [47.34106, 19.21269], "BP854": [47.35983, 19.36419], "BP855": [47.28428, 19.48556],
+            "BP856": [47.21667, 19.59369], "BP863": [47.46694, 19.22272], "BP864": [47.35114, 19.40956],
+            "BP865": [47.29486, 19.49986], "BP866": [47.22725, 19.60797], "BP870": [47.82369, 18.82367],
+            "BP871": [47.70031, 19.02617], "BP872": [47.59072, 19.20467], "BP874": [47.44536, 19.43964],
+            "BP883": [47.63419, 19.45767], "BP884": [47.55361, 19.59056], "BP885": [47.46686, 19.73292],
+            "CATUZ": [47.67583, 19.06614], "DUZLA": [46.95694, 18.73028], "EBAMO": [46.83220, 19.59250],
+            "ECMAN": [47.54208, 18.88594], "EDEMU": [48.17440, 19.80830], "ERGOM": [47.79444, 18.74111],
+            "FAHAZ": [46.88861, 19.04861], "FERER": [47.63694, 19.57194], "FUTNA": [47.15228, 19.69622],
+            "GAZDA": [46.80528, 19.39694], "GELSA": [47.01389, 19.78917], "GIFRA": [47.74656, 18.76619],
+            "GILEP": [47.48339, 18.25878], "HUZTA": [47.60817, 18.77761], "JOZEP": [47.18917, 18.74028], 
+            "KATLI": [47.11861, 18.75167], "KENES": [47.04583, 18.39778], "KERET": [47.69750, 18.44194],
+            "KEZAL": [47.15360, 20.23140], "LAHOR": [47.83167, 19.72806], "LITKU": [48.23053, 19.59853],
+            "LUCLA": [47.69619, 19.54222], "MAMOR": [47.53389, 19.98972], "MEZOS": [47.28861, 18.42306],
+            "NARKA": [47.83917, 19.82500], "NICRA": [47.35619, 19.58272], "OCRIT": [47.33503, 19.94539],
+            "ODVAS": [47.27083, 19.32631], "OFENA": [47.16278, 19.71058], "PUCOG": [47.41561, 18.59189],
+            "PUSTA": [47.45667, 18.17222], "RW13L": [47.44542, 19.25756], "RW13R": [47.44869, 19.22075],
+            "RW31L": [47.43047, 19.25025], "RW31R": [47.42294, 19.29386], "SOROS": [47.84278, 19.32611],
+            "TORAZ": [47.73603, 18.75164], "TPS":   [47.49325, 19.44622], "ULPAX": [47.52561, 19.31019],
+            "ULZAK": [46.99420, 18.56690], "UTCON": [47.28850, 19.69083], "VAJDI": [47.37560, 18.28580],
+            "VALVO": [47.60694, 19.69167], "VETIK": [47.35278, 20.23250], "WITRI": [48.14833, 20.12000],
+            "WONTA": [47.15533, 19.51103], "ZURFA": [47.39778, 19.84583]
         };
 
         // Monochromatic Layer Configurations
@@ -723,25 +687,25 @@
         L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31LStyle).addTo(sid31lGroup);
         L.polyline([wp["BP803"], wp["BP813"]], sid31LStyle).addTo(sid31lGroup);
         L.polyline([wp["BP803"], wp["BADOV"]], sid31LStyle).addTo(sid31lGroup);
-		L.polyline([wp["BP821"], wp["PUCOG"], wp["GILEP"]], sid31LStyle).addTo(sid31lGroup);
-		L.polyline([wp["BP822"], wp["DUZLA"]], sid31LStyle).addTo(sid31lGroup);
-		L.polyline([wp["BP822"], wp["FAHAZ"]], sid31LStyle).addTo(sid31lGroup);
-		L.polyline([wp["BP822"], wp["GAZDA"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP821"], wp["PUCOG"], wp["GILEP"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP822"], wp["DUZLA"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP822"], wp["FAHAZ"]], sid31LStyle).addTo(sid31lGroup);
+        L.polyline([wp["BP822"], wp["GAZDA"]], sid31LStyle).addTo(sid31lGroup);
 
-		// SID 13L
-		L.polyline([rwy31R, wp["BP701"], wp["BP712"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP701"], wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
-		L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
+        // SID 13L
+        L.polyline([rwy31R, wp["BP701"], wp["BP712"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP701"], wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
+        L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
 
-		// STAR 31L/31R
+        // STAR 31L/31R
         L.polyline([wp["ANEXA"], wp["BP840"], wp["BP841"], wp["BP842"], wp["BP843"], wp["BP844"], wp["ATICO"]], star31Style).addTo(star31Group);
         L.polyline([wp["ARFOX"], wp["BP870"], wp["BP871"], wp["BP872"], wp["ULPAX"], wp["BP874"], wp["NICRA"]], star31Style).addTo(star31Group);
         L.polyline([wp["VAJDI"], wp["JOZEP"], wp["BP834"], wp["BP844"]], star31Style).addTo(star31Group);
@@ -750,8 +714,8 @@
         L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP885"], wp["BP884"], wp["BP883"], wp["ULPAX"]], star31Style).addTo(star31Group);
         L.polyline([wp["EDEMU"], wp["LAHOR"], wp["LUCLA"], wp["BP883"]], star31Style).addTo(star31Group);
         L.polyline([wp["BETED"], wp["LAHOR"]], star31Style).addTo(star31Group);
-		
-		// STAR 13L/13R
+        
+        // STAR 13L/13R
         L.polyline([wp["EBAMO"], wp["BP741"], wp["BP742"], wp["BP743"], wp["BP744"], wp["ECMAN"]], star13Style).addTo(star13Group);
         L.polyline([wp["ULZAK"], wp["JOZEP"], wp["BP723"], wp["BP733"], wp["BP743"]], star13Style).addTo(star13Group);
         L.polyline([wp["ANEXA"], wp["BP736"], wp["BP735"], wp["BP734"], wp["BP733"]], star13Style).addTo(star13Group);
@@ -760,7 +724,7 @@
         L.polyline([wp["BETED"], wp["LAHOR"], wp["LUCLA"], wp["BP783"], wp["ULPAX"]], star13Style).addTo(star13Group);
         L.polyline([wp["EDEMU"], wp["LAHOR"]], star13Style).addTo(star13Group);
         L.polyline([wp["ARFOX"], wp["BP786"], wp["BP785"], wp["BP784"], wp["BP783"]], star13Style).addTo(star13Group);
-		
+        
         // ==========================================
         // Real-world Precision Holding Pattern Vectors
         // ==========================================
@@ -863,11 +827,6 @@
             lineJoin: 'round'
         });
 
-        // Pulls the full retained trace from airplanes.live's globe backend (the same
-        // JSON file their own web globe uses to draw history when you click a plane).
-        // This is NOT part of the documented airplanes.live REST API, so it's fetched
-        // best-effort with a CORS-proxy fallback and silently ignored on failure --
-        // the line still works from session-only data if this can't be reached.
         async function fetchAircraftHistory(hex) {
             const cleanHex = hex.replace('~', '').toLowerCase().padStart(6, '0');
             const chunk = cleanHex.slice(-2);
@@ -892,8 +851,6 @@
             }
         }
 
-        // Trims the trace down to just the most recent leg (i.e. since last takeoff)
-        // using readsb's "start of new leg" flag (bit 2 of the flags field).
         function extractPointsSinceLastTakeoff(data) {
             if (!data || !Array.isArray(data.trace)) return [];
             const trace = data.trace;
@@ -931,7 +888,6 @@
         }
 
         function selectAircraft(id) {
-            // Clear previous selection's highlight
             if (selectedAircraftId && aircraftState[selectedAircraftId]) {
                 const prevIcon = aircraftState[selectedAircraftId].ui.marker.getElement();
                 if (prevIcon) prevIcon.classList.remove('selected');
@@ -944,11 +900,9 @@
                 const icon = state.ui.marker.getElement();
                 if (icon) icon.classList.add('selected');
 
-                // Fetch the extended pre-session history once per aircraft selection
                 if (!state.historyFetchAttempted) {
                     state.historyFetchAttempted = true;
                     fetchAircraftHistory(state.id).then(data => {
-                        // Bail if the user selected something else while this was in flight
                         if (selectedAircraftId !== id || !aircraftState[id]) return;
                         const histPoints = extractPointsSinceLastTakeoff(data);
                         if (histPoints.length) {
@@ -962,7 +916,6 @@
             updateTrackHistoryLine();
         }
 
-        // Clicking empty map space deselects the current track
         map.on('click', function() {
             if (selectedAircraftId) selectAircraft(selectedAircraftId);
         });
@@ -1024,9 +977,6 @@
                     state.telemetry.push({ time: now, lat: t.lat, lon: t.lon, alt: t.alt, spd: t.spd, hdg: t.hdg });
                     if (state.telemetry.length > 4) state.telemetry.shift();
 
-                    // Full-session track (since this aircraft first appeared on radar, i.e.
-                    // effectively since its last takeoff for departures). Intentionally
-                    // uncapped so the selected-aircraft track line can span the whole session.
                     state.trackHistory.push([t.lat, t.lon]);
 
                     const dot = L.circleMarker([t.lat, t.lon], { radius: 1, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false }).addTo(state.featureGroup);
@@ -1059,7 +1009,6 @@
             const limitFL = parseInt(document.getElementById('alt-filter-slider').value, 10);
             const trafficLayerActive = document.getElementById('layer-traffic').checked;
 
-            // Updated to handle simplified filter architecture (MLAT vs OTHER)
             const showMlat = document.getElementById('src-mlat').checked;
             const showOther = document.getElementById('src-other').checked;
 
@@ -1087,7 +1036,6 @@
             const renderTime = Date.now() - RENDER_DELAY_MS;
             const useLongFormat = document.getElementById('callsign-format-long').checked;
 
-            // Fetch live substring input buffer parameters dynamically
             const searchInput = document.getElementById('radar-search');
             const searchQuery = searchInput ? searchInput.value.toUpperCase().trim() : "";
 
@@ -1153,7 +1101,6 @@
                     state.ui.leaderLine.setLatLngs([currentPos, leaderEnd]).setStyle({opacity: 0.5});
                     state.ui.dataBlock.setLatLng(leaderEnd);
 
-                    // Dynamic Altitude Prefix (LHBP Transition Altitude is 10,000 ft)
                     const isBelowTA = interpAlt < 10000;
                     const altPrefix = isBelowTA ? 'A' : 'F';
                     const flStr = Math.round(interpAlt / 100).toString().padStart(3, '0');
@@ -1168,13 +1115,11 @@
                         else if (diff < -50) trend = "▼";
                     }
 
-                    // Scan target aircraft attributes against search key variables
                     const isAircraftMatched = searchQuery && (
                         state.callsign.toUpperCase().includes(searchQuery) || 
                         labelCallsign.toUpperCase().includes(searchQuery)
                     );
 
-                    // Dynamic tactical palette switching based on active search matches
                     const callsignColor = isAircraftMatched ? '#FFFF00' : '#5DEB3D';
                     const dataLineColor = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,1.0)';
                     const acTypeColor   = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,0.5)';
@@ -1208,7 +1153,6 @@
                 if (!ac.lat || !ac.lon || !inRadarBox(ac.lat, ac.lon)) return;
                 if (ac.alt_baro === 'ground') return;
                 
-                // Maps airplanes.live flags to unified MLAT vs OTHER structures safely
                 let srcType = 'OTHER';
                 
                 if (ac.type === 'adsb_icao' || ac.type === 'adsb_icao_nt' || ac.type === 'adsr_icao') {
