@@ -240,6 +240,16 @@
             <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
         </label>
 
+        <div class="radar-ui-section">Weather</div>
+        <label class="radar-ui-control">
+            <input type="checkbox" id="layer-rain"> PRECIP RADAR
+        </label>
+        <div class="radar-slider-container" id="rain-opacity-container" style="display:none;">
+            <div class="radar-ui-section" style="margin: 0 0 2px 0;">Radar Opacity</div>
+            <div class="radar-slider-output" id="rain-opacity-val">70%</div>
+            <input type="range" id="rain-opacity-slider" class="radar-ui-slider" min="10" max="100" step="10" value="70">
+        </div>
+
         <div class="radar-ui-section">Departures</div>
         <label class="radar-ui-control">
             <input type="checkbox" id="layer-sid31l"> SID 31L
@@ -405,6 +415,78 @@
                 map.addLayer(darkAllNoLabels);
             }
         });
+
+        // ==========================================
+        // RainViewer Precipitation Radar Overlay
+        // ==========================================
+        // RainViewer only serves radar tiles up to zoom 7 natively. maxNativeZoom
+        // tells Leaflet to keep requesting z7 tiles and upscale/stretch them for
+        // any deeper zoom the scope is set to, rather than the layer vanishing.
+        const RAIN_REFRESH_MS = 2 * 60 * 1000; // RainViewer publishes new frames every ~10 min, poll every 2 min
+        let rainLayer = null;
+        let rainOpacity = 0.7;
+
+        function buildRainLayer(tilePath) {
+            return L.tileLayer(`https://tilecache.rainviewer.com${tilePath}/256/{z}/{x}/{y}/2/1_1.png`, {
+                maxNativeZoom: 7,
+                maxZoom: 18,
+                opacity: rainOpacity,
+                zIndex: 450, // above basemap, below traffic/labels which are added later
+                attribution: 'Radar &copy; RainViewer'
+            });
+        }
+
+        async function refreshRainLayer() {
+            const rainEnabled = document.getElementById('layer-rain').checked;
+            if (!rainEnabled) return;
+
+            try {
+                const res = await fetch('https://api.rainviewer.com/public/weather-maps.json', { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                const frames = data.radar && data.radar.past ? data.radar.past : [];
+                if (frames.length === 0) throw new Error('No radar frames returned');
+
+                const latestFrame = frames[frames.length - 1];
+                const newLayer = buildRainLayer(latestFrame.path);
+
+                // Swap layers only once the new tiles are ready, so the overlay never flickers blank
+                newLayer.addTo(map);
+                if (rainLayer) {
+                    newLayer.once('load', () => {
+                        map.removeLayer(rainLayer);
+                        rainLayer = newLayer;
+                    });
+                } else {
+                    rainLayer = newLayer;
+                }
+            } catch (err) {
+                console.error('RainViewer fetch error:', err);
+            }
+        }
+
+        document.getElementById('layer-rain').addEventListener('change', function(e) {
+            const opacityContainer = document.getElementById('rain-opacity-container');
+            if (e.target.checked) {
+                opacityContainer.style.display = 'block';
+                refreshRainLayer();
+            } else {
+                opacityContainer.style.display = 'none';
+                if (rainLayer) {
+                    map.removeLayer(rainLayer);
+                    rainLayer = null;
+                }
+            }
+        });
+
+        document.getElementById('rain-opacity-slider').addEventListener('input', function(e) {
+            rainOpacity = parseInt(e.target.value, 10) / 100;
+            document.getElementById('rain-opacity-val').textContent = `${e.target.value}%`;
+            if (rainLayer) rainLayer.setOpacity(rainOpacity);
+        });
+
+        setInterval(refreshRainLayer, RAIN_REFRESH_MS);
 
         // 2. Exact coordinates for LHBP Runway Thresholds 
         const rwy13R = [47.4487, 19.2208]; 
