@@ -228,6 +228,9 @@
 		
 		<div class="radar-ui-section">Map options</div>
         <label class="radar-ui-control">
+            <input type="checkbox" id="map-labels" checked> MAP LABELS
+        </label>
+        <label class="radar-ui-control">
             <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
         </label>
         <label class="radar-ui-control">
@@ -385,8 +388,23 @@
             attributionControl: false
         }).setView([47.4369, 19.2556], 9.5);
         
-        // Pure black tactical basemap
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        // Define CartoDB Basemap Variants (With Labels & No Labels)
+        const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+        const darkAllNoLabels   = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png');
+
+        // Add default basemap with labels to map
+        darkAllWithLabels.addTo(map);
+
+        // Map Labels Toggle Listener
+        document.getElementById('map-labels').addEventListener('change', function(e) {
+            if (e.target.checked) {
+                map.removeLayer(darkAllNoLabels);
+                map.addLayer(darkAllWithLabels);
+            } else {
+                map.removeLayer(darkAllWithLabels);
+                map.addLayer(darkAllNoLabels);
+            }
+        });
 
         // 2. Exact coordinates for LHBP Runway Thresholds 
         const rwy13R = [47.4487, 19.2208]; 
