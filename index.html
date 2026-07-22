@@ -827,47 +827,6 @@
             lineJoin: 'round'
         });
 
-        async function fetchAircraftHistory(hex) {
-            const cleanHex = hex.replace('~', '').toLowerCase().padStart(6, '0');
-            const chunk = cleanHex.slice(-2);
-            const targetUrl = `https://globe.airplanes.live/data/traces/${chunk}/trace_full_${cleanHex}.json`;
-
-            async function tryFetch(url) {
-                const res = await fetch(url, { cache: 'no-store' });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.json();
-            }
-
-            try {
-                return await tryFetch(targetUrl);
-            } catch (err) {
-                try {
-                    const proxied = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl + '?_=' + Date.now())}`;
-                    return await tryFetch(proxied);
-                } catch (err2) {
-                    console.warn(`Track history unavailable for ${hex} (session-only track will be used):`, err2.message);
-                    return null;
-                }
-            }
-        }
-
-        function extractPointsSinceLastTakeoff(data) {
-            if (!data || !Array.isArray(data.trace)) return [];
-            const trace = data.trace;
-            let legStartIdx = 0;
-            for (let i = 0; i < trace.length; i++) {
-                const flags = trace[i][6];
-                if (typeof flags === 'number' && (flags & 2)) legStartIdx = i;
-            }
-            const points = [];
-            for (let i = legStartIdx; i < trace.length; i++) {
-                const lat = trace[i][1];
-                const lon = trace[i][2];
-                if (typeof lat === 'number' && typeof lon === 'number') points.push([lat, lon]);
-            }
-            return points;
-        }
-
         function updateTrackHistoryLine() {
             const state = selectedAircraftId ? aircraftState[selectedAircraftId] : null;
             if (!state) {
@@ -878,7 +837,6 @@
 
             const currentPos = state.ui.marker.getLatLng();
             const points = [
-                ...(state.historicalTrack || []),
                 ...state.trackHistory,
                 ...(currentPos ? [[currentPos.lat, currentPos.lng]] : [])
             ];
@@ -896,21 +854,8 @@
             selectedAircraftId = (selectedAircraftId === id) ? null : id;
 
             if (selectedAircraftId && aircraftState[selectedAircraftId]) {
-                const state = aircraftState[selectedAircraftId];
-                const icon = state.ui.marker.getElement();
+                const icon = aircraftState[selectedAircraftId].ui.marker.getElement();
                 if (icon) icon.classList.add('selected');
-
-                if (!state.historyFetchAttempted) {
-                    state.historyFetchAttempted = true;
-                    fetchAircraftHistory(state.id).then(data => {
-                        if (selectedAircraftId !== id || !aircraftState[id]) return;
-                        const histPoints = extractPointsSinceLastTakeoff(data);
-                        if (histPoints.length) {
-                            aircraftState[id].historicalTrack = histPoints;
-                            updateTrackHistoryLine();
-                        }
-                    });
-                }
             }
 
             updateTrackHistoryLine();
@@ -1267,10 +1212,44 @@
         });
 
         // Main Application Dynamic Bootstrapping Sequence
+        //
+        // Chromium (incl. Vivaldi) aggressively throttles setInterval/setTimeout on
+        // background tabs -- after a few minutes hidden, timers can be clamped to
+        // firing roughly once a minute, which is why the radar sweep goes sparse
+        // when this tab isn't focused. Dedicated Web Workers run on a separate
+        // thread and are exempt from that background-tab clamp, so we use a tiny
+        // inline worker purely as a precise metronome: it just posts a "tick"
+        // message on schedule, and the main thread does the actual fetch/render
+        // work as before. This keeps the sweep interval accurate even when the
+        // tab is backgrounded, minimized, or in another virtual desktop.
+        const sweepWorkerSrc = `
+            let intervalId = null;
+            self.onmessage = function(e) {
+                if (e.data && e.data.type === 'start') {
+                    if (intervalId) clearInterval(intervalId);
+                    intervalId = setInterval(() => self.postMessage('tick'), e.data.intervalMs);
+                }
+            };
+        `;
+        let sweepWorker = null;
+        try {
+            const workerBlob = new Blob([sweepWorkerSrc], { type: 'application/javascript' });
+            sweepWorker = new Worker(URL.createObjectURL(workerBlob));
+            sweepWorker.onmessage = function(e) {
+                if (e.data === 'tick') fetchRadarSweep();
+            };
+        } catch (err) {
+            console.warn('Web Worker unavailable, falling back to setInterval (sweep may go sparse in background tabs):', err);
+        }
+
         async function bootApp() {
             await initAirlineDatabase(); 
-            fetchRadarSweep();          
-            setInterval(fetchRadarSweep, SWEEP_INTERVAL_MS); 
+            fetchRadarSweep();
+            if (sweepWorker) {
+                sweepWorker.postMessage({ type: 'start', intervalMs: SWEEP_INTERVAL_MS });
+            } else {
+                setInterval(fetchRadarSweep, SWEEP_INTERVAL_MS);
+            }
         }
 
         bootApp();
