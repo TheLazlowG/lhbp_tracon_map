@@ -15,35 +15,30 @@
             left: 50%;
             transform: translateX(-50%);
             background: rgba(8, 8, 8, 0.4);
-            border: 0px solid rgba(255, 255, 255, 0.8);
-            padding: 6px 16px;
+            padding: 1px 4px;
             z-index: 1000;
             font-family: 'Noto Sans Mono', monospace;
             color: #8A8A8A;
             font-size: 16px;
             font-weight: normal;
             letter-spacing: 0px;
-            border-radius: 2px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             pointer-events: none;
         }
 
         /* METAR Report Panel */
         .radar-metar-panel {
             position: absolute;
-            top: 40px;
+            top: 39px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(8, 8, 8, 0.4);
-            padding: 4px 16px;
+            padding: 1px 4px;
             z-index: 1000;
             font-family: 'Noto Sans Mono', monospace;
             color: #8A8A8A;
             font-size: 12px;
             font-weight: normal;
             letter-spacing: 0.5px;
-            border-radius: 2px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             pointer-events: none;
             white-space: nowrap;
             max-width: 90vw;
@@ -90,6 +85,33 @@
         .radar-ui-toggle-btn:hover {
             color: #ffffff;
             background: rgba(20, 20, 20, 0.95);
+        }
+
+        /* Reset View Button */
+        .radar-reset-btn {
+            width: 100%;
+            background: #141414;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: #8A8A8A;
+            padding: 6px;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            box-sizing: border-box;
+            border-radius: 2px;
+            cursor: pointer;
+            margin-bottom: 14px;
+        }
+        .radar-reset-btn:hover {
+            color: #ffffff;
+            border-color: #ffffff;
+            background: rgba(20, 20, 20, 0.95);
+        }
+        .radar-reset-btn:active {
+            color: #5DEB3D;
+            border-color: #5DEB3D;
         }
 
         /* Tactical Control Panel UI */
@@ -177,6 +199,48 @@
             background: #222;
         }
 
+        /* ATC Radio Frequency Link List */
+        .radar-atc-links {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .radar-atc-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #141414;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #8A8A8A;
+            padding: 6px 8px;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 10.5px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-decoration: none;
+            border-radius: 2px;
+            transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+        .radar-atc-link:before {
+            content: "\25B8";
+            color: #5DEB3D;
+            margin-right: 6px;
+        }
+        .radar-atc-link:hover {
+            color: #ffffff;
+            border-color: #5DEB3D;
+            background: rgba(93, 235, 61, 0.08);
+        }
+        .radar-atc-link-all {
+            color: #5DEB3D;
+            border-color: rgba(93, 235, 61, 0.4);
+            margin-top: 2px;
+        }
+        .radar-atc-link-all:before {
+            content: "";
+            margin-right: 0;
+        }
+
         /* Waypoint Alphanumeric Text Styling */
         .fix-label {
             color: #8A8A8A;
@@ -237,6 +301,8 @@
     <div class="radar-ui-wrapper" id="radar-ui-wrapper">
         <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
         <div class="radar-ui-panel">
+            <button type="button" id="reset-view-btn" class="radar-reset-btn">Reset View</button>
+
             <div class="radar-ui-title">Radar Search</div>
             <div class="radar-search-container">
                 <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
@@ -258,6 +324,12 @@
                 <input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250">
             </div>
 
+            <div class="radar-slider-container">
+                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Prediction Line</div>
+                <div class="radar-slider-output" id="predict-len-val">0.25 MIN</div>
+                <input type="range" id="predict-len-slider" class="radar-ui-slider" min="0.0" max="5" step="0.25" value="0.25">
+            </div>
+
             <div class="radar-ui-section">ACFT Data Source</div>
             <label class="radar-ui-control">
                 <input type="checkbox" id="src-mlat"> MLAT
@@ -268,7 +340,7 @@
             
             <div class="radar-ui-section">Map options</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="map-labels" checked> MAP LABELS
+                <input type="checkbox" id="map-labels"> MAP LABELS
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
@@ -279,6 +351,7 @@
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
             </label>
+            <input type="checkbox" id="multi-select-tracks" checked style="display:none;">
 
             <div class="radar-ui-section">Weather</div>
             <label class="radar-ui-control">
@@ -305,6 +378,18 @@
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-star13"> STAR 13L/13R
             </label>
+
+            <div class="radar-ui-title" style="margin-top: 14px;">LHBP ATC Radio</div>
+            <div class="radar-atc-links">
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_app_122980&icao=lhbp" data-atc-popup>APP (122.980)</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_app_123860&icao=lhbp" data-atc-popup>APP (123.860)</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_dir_119510&icao=lhbp" data-atc-popup>DIR (119.510)</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_twr_118715&icao=lhbp" data-atc-popup>TWR (118.715)</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_info_119350&icao=lhbp" data-atc-popup>INFO (119.350)</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_atis&icao=lhbp" data-atc-popup>ATIS</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp1_2&icao=lhbp" data-atc-popup>TWR/INFO</a>
+                <a class="radar-atc-link radar-atc-link-all" href="https://www.liveatc.net/search/?icao=lhbp" target="_blank" rel="noopener noreferrer">ALL LHBP FEEDS &rarr;</a>
+            </div>
         </div>
     </div>
 
@@ -325,6 +410,40 @@
             } else {
                 uiToggleBtn.textContent = '>';
             }
+        });
+
+        // ==========================================
+        // Reset View Button
+        // ==========================================
+        document.getElementById('reset-view-btn').addEventListener('click', function() {
+            map.setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
+        });
+
+        // ==========================================
+        // ATC Radio Links -> Open in a small popup window
+        // ==========================================
+        const ATC_POPUP_WIDTH = 420;
+        const ATC_POPUP_HEIGHT = 320;
+
+        document.querySelectorAll('[data-atc-popup]').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const url = link.getAttribute('href');
+
+                const left = Math.round((window.screen.width - ATC_POPUP_WIDTH) / 2);
+                const top = Math.round((window.screen.height - ATC_POPUP_HEIGHT) / 2);
+                const features = `width=${ATC_POPUP_WIDTH},height=${ATC_POPUP_HEIGHT},left=${left},top=${top},` +
+                    `resizable=yes,scrollbars=yes,toolbar=no,location=no,menubar=no,status=no`;
+
+                const popupName = 'lhbp_atc_' + link.textContent.trim().replace(/[^A-Za-z0-9]+/g, '_');
+                const popup = window.open(url, popupName, features);
+                if (popup) {
+                    popup.focus();
+                } else {
+                    // Popup blocked by browser -> fall back to a normal new tab
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+            });
         });
 
         // ==========================================
@@ -440,17 +559,19 @@
         let useLongCallsign = false;
 
         // 1. Initialize map centered on Budapest Airport (LHBP)
+        const INITIAL_VIEW_CENTER = [47.4369, 19.2556];
+        const INITIAL_VIEW_ZOOM = 9.5;
         const map = L.map('radar-scope', {
             zoomControl: false,
             attributionControl: false
-        }).setView([47.4369, 19.2556], 9.5);
+        }).setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
         
         // Define CartoDB Basemap Variants (With Labels & No Labels)
         const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
         const darkAllNoLabels   = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png');
 
-        // Add default basemap with labels to map
-        darkAllWithLabels.addTo(map);
+        // Add default basemap without labels to map
+        darkAllNoLabels.addTo(map);
 
         // Map Labels Toggle Listener
         document.getElementById('map-labels').addEventListener('change', function(e) {
@@ -466,9 +587,15 @@
         // ==========================================
         // RainViewer Precipitation Radar Overlay
         // ==========================================
-        const RAIN_REFRESH_MS = 2 * 60 * 1000;
+        // RainViewer publishes a new radar frame every 10 minutes. We poll
+        // slightly more often than that (every 3 min) so a new frame is
+        // picked up promptly after it's published, but we only actually
+        // swap the tile layer when the frame timestamp has changed, so we
+        // don't reload identical tiles in between.
+        const RAIN_REFRESH_MS = 1 * 60 * 1000;
         let rainLayer = null;
         let rainOpacity = 0.7;
+        let rainLastFrameTime = null;
 
         function buildRainLayer(tilePath) {
             return L.tileLayer(`https://tilecache.rainviewer.com${tilePath}/256/{z}/{x}/{y}/2/1_1.png`, {
@@ -493,6 +620,10 @@
                 if (frames.length === 0) throw new Error('No radar frames returned');
 
                 const latestFrame = frames[frames.length - 1];
+
+                // Skip if this is the same frame we're already displaying
+                if (rainLayer && rainLastFrameTime === latestFrame.time) return;
+
                 const newLayer = buildRainLayer(latestFrame.path);
 
                 newLayer.addTo(map);
@@ -500,9 +631,11 @@
                     newLayer.once('load', () => {
                         map.removeLayer(rainLayer);
                         rainLayer = newLayer;
+                        rainLastFrameTime = latestFrame.time;
                     });
                 } else {
                     rainLayer = newLayer;
+                    rainLastFrameTime = latestFrame.time;
                 }
             } catch (err) {
                 console.error('RainViewer fetch error:', err);
@@ -519,6 +652,7 @@
                 if (rainLayer) {
                     map.removeLayer(rainLayer);
                     rainLayer = null;
+                    rainLastFrameTime = null;
                 }
             }
         });
@@ -781,7 +915,7 @@
         const SWEEP_INTERVAL_MS = 2000;
         const RENDER_DELAY_MS = 2000;
         const HISTORY_LENGTH = 30;
-        const PREDICT_MINUTES = 0.25;
+        let PREDICT_MINUTES = 0.25;
         const RADAR_CENTER = [47.4369, 19.2556];
         const RADAR_RADIUS_NM = 150;
         const RADAR_BBOX = { minLat: 46.5, minLon: 18.0, maxLat: 48.5, maxLon: 20.5 };
@@ -818,22 +952,38 @@
         // ==========================================
         // 8b. Track History Selection
         // ==========================================
-        let selectedAircraftId = null;
-        const trackHistoryLine = L.polyline([], {
-            color: '#5DEB3D',
-            weight: 1.5,
-            opacity: 0.85,
-            interactive: false,
-            lineJoin: 'round'
-        });
+        // selectedAircraftIds holds every currently-selected aircraft. In
+        // single-select mode (default) it will only ever contain 0 or 1 ids.
+        // When "MULTI-SELECT TRACKS" is enabled, clicking additional
+        // aircraft adds them to the set instead of replacing the selection,
+        // so multiple track history lines can be shown at once.
+        const selectedAircraftIds = new Set();
+        const trackHistoryLines = new Map(); // id -> L.polyline
 
-        function updateTrackHistoryLine() {
-            const state = selectedAircraftId ? aircraftState[selectedAircraftId] : null;
-            if (!state) {
-                if (map.hasLayer(trackHistoryLine)) map.removeLayer(trackHistoryLine);
-                trackHistoryLine.setLatLngs([]);
-                return;
+        function isMultiSelectEnabled() {
+            const el = document.getElementById('multi-select-tracks');
+            return el ? el.checked : false;
+        }
+
+        function getOrCreateTrackLine(id) {
+            let line = trackHistoryLines.get(id);
+            if (!line) {
+                line = L.polyline([], {
+                    color: '#5DEB3D',
+                    weight: 1.5,
+                    opacity: 0.85,
+                    interactive: false,
+                    lineJoin: 'round'
+                });
+                trackHistoryLines.set(id, line);
             }
+            return line;
+        }
+
+        function updateTrackHistoryLine(id) {
+            const state = aircraftState[id];
+            const line = trackHistoryLines.get(id);
+            if (!state || !line) return;
 
             const currentPos = state.ui.marker.getLatLng();
             const points = [
@@ -841,28 +991,72 @@
                 ...(currentPos ? [[currentPos.lat, currentPos.lng]] : [])
             ];
 
-            trackHistoryLine.setLatLngs(points);
-            if (!map.hasLayer(trackHistoryLine)) trackHistoryLine.addTo(map);
+            line.setLatLngs(points);
+            if (!map.hasLayer(line)) line.addTo(map);
+        }
+
+        function updateAllTrackHistoryLines() {
+            selectedAircraftIds.forEach(id => updateTrackHistoryLine(id));
+        }
+
+        function deselectAircraft(id) {
+            if (!selectedAircraftIds.has(id)) return;
+            selectedAircraftIds.delete(id);
+
+            if (aircraftState[id]) {
+                const icon = aircraftState[id].ui.marker.getElement();
+                if (icon) icon.classList.remove('selected');
+            }
+
+            const line = trackHistoryLines.get(id);
+            if (line) {
+                if (map.hasLayer(line)) map.removeLayer(line);
+                trackHistoryLines.delete(id);
+            }
+        }
+
+        function deselectAllAircraft() {
+            Array.from(selectedAircraftIds).forEach(deselectAircraft);
         }
 
         function selectAircraft(id) {
-            if (selectedAircraftId && aircraftState[selectedAircraftId]) {
-                const prevIcon = aircraftState[selectedAircraftId].ui.marker.getElement();
-                if (prevIcon) prevIcon.classList.remove('selected');
+            const multi = isMultiSelectEnabled();
+
+            if (selectedAircraftIds.has(id)) {
+                // Clicking an already-selected aircraft toggles it off
+                deselectAircraft(id);
+                return;
             }
 
-            selectedAircraftId = (selectedAircraftId === id) ? null : id;
+            if (!multi) {
+                // Single-select mode: clear any existing selection first
+                deselectAllAircraft();
+            }
 
-            if (selectedAircraftId && aircraftState[selectedAircraftId]) {
-                const icon = aircraftState[selectedAircraftId].ui.marker.getElement();
+            selectedAircraftIds.add(id);
+            getOrCreateTrackLine(id);
+
+            if (aircraftState[id]) {
+                const icon = aircraftState[id].ui.marker.getElement();
                 if (icon) icon.classList.add('selected');
             }
 
-            updateTrackHistoryLine();
+            updateTrackHistoryLine(id);
         }
 
+        // Turning multi-select off collapses the selection down to at most
+        // one aircraft (the most recently selected), same as single-select.
+        document.getElementById('multi-select-tracks').addEventListener('change', function(e) {
+            if (!e.target.checked && selectedAircraftIds.size > 1) {
+                const keepId = Array.from(selectedAircraftIds).pop();
+                Array.from(selectedAircraftIds).forEach(id => {
+                    if (id !== keepId) deselectAircraft(id);
+                });
+            }
+        });
+
         map.on('click', function() {
-            if (selectedAircraftId) selectAircraft(selectedAircraftId);
+            deselectAllAircraft();
         });
 
         function initAircraftState(id, callsign, srcType) {
@@ -938,9 +1132,8 @@
                     if (trafficGroup.hasLayer(aircraftState[id].featureGroup)) {
                         trafficGroup.removeLayer(aircraftState[id].featureGroup);
                     }
-                    if (id === selectedAircraftId) {
-                        selectedAircraftId = null;
-                        updateTrackHistoryLine();
+                    if (selectedAircraftIds.has(id)) {
+                        deselectAircraft(id);
                     }
                     delete aircraftState[id];
                 }
@@ -949,6 +1142,7 @@
             setTrafficSource('live', sourceLabel, siteDomain);
             applyFiltering();
         }
+
 
         function applyFiltering() {
             const limitFL = parseInt(document.getElementById('alt-filter-slider').value, 10);
@@ -1085,7 +1279,7 @@
                 }
             });
 
-            if (selectedAircraftId) updateTrackHistoryLine();
+            if (selectedAircraftIds.size > 0) updateAllTrackHistoryLines();
 
             requestAnimationFrame(renderLoop);
         }
@@ -1151,6 +1345,13 @@
             const val = parseInt(e.target.value, 10);
             document.getElementById('alt-filter-val').textContent = `FL${val.toString().padStart(3, '0')}`;
             applyFiltering();
+        });
+
+        // Prediction Line Length Slider Observer
+        document.getElementById('predict-len-slider').addEventListener('input', function(e) {
+            const val = parseFloat(e.target.value);
+            PREDICT_MINUTES = val;
+            document.getElementById('predict-len-val').textContent = `${val.toFixed(2)} MIN`;
         });
 
         // Initialize Event Listeners for Simplified Hardware Source Switches
