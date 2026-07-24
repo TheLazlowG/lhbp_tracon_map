@@ -1141,6 +1141,14 @@
 
             setTrafficSource('live', sourceLabel, siteDomain);
             applyFiltering();
+
+            // Track history lines only need to grow when new ADS-B position
+            // data actually comes in (once per sweep), not on every
+            // animation frame -- rebuilding the polyline geometry is
+            // relatively expensive (re-projection + path regeneration), so
+            // doing it 60x/sec in renderLoop was pegging the CPU/GPU for no
+            // visual benefit.
+            if (selectedAircraftIds.size > 0) updateAllTrackHistoryLines();
         }
 
 
@@ -1278,8 +1286,6 @@
                     state.ui.dataBlock.setOpacity(0);
                 }
             });
-
-            if (selectedAircraftIds.size > 0) updateAllTrackHistoryLines();
 
             requestAnimationFrame(renderLoop);
         }
