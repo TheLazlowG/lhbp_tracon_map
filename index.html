@@ -521,22 +521,25 @@
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
         async function initAirlineDatabase() {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/npow/airline-codes/master/airlines.json');
+                const response = await fetch('data/callsigns.json');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const data = await response.json();
-                data.forEach(airline => {
-                    if (airline.icao && airline.callsign) {
-                        const icaoKey = airline.icao.toUpperCase().trim();
+                // data/callsigns.json is an object keyed by ICAO code, e.g.
+                // { "AAD": { "callsign": "PANABEAR", "company": "...", "country": "..." }, ... }
+                Object.keys(data).forEach(icaoKey => {
+                    const entry = data[icaoKey];
+                    if (entry && entry.callsign) {
+                        const key = icaoKey.toUpperCase().trim();
                         // Prefer predefined script callsigns if they already exist
-                        if (!AIRLINE_TELEPHONY[icaoKey]) {
-                            AIRLINE_TELEPHONY[icaoKey] = airline.callsign.toUpperCase().trim();
+                        if (!AIRLINE_TELEPHONY[key]) {
+                            AIRLINE_TELEPHONY[key] = entry.callsign.toUpperCase().trim();
                         }
                     }
                 });
-                console.log(`Global database connected. Loaded ${Object.keys(AIRLINE_TELEPHONY).length} telephony profiles.`);
+                console.log(`Local callsign database loaded. ${Object.keys(AIRLINE_TELEPHONY).length} telephony profiles.`);
             } catch (err) {
-                console.warn("External airline telemetry directory unresolvable, relying on expanded core cache:", err);
+                console.warn("Local callsign directory (data/callsigns.json) unresolvable, relying on expanded core cache:", err);
             }
         }
 
