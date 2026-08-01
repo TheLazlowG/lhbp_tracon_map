@@ -4,7 +4,7 @@
 // or inject one at build time to enable terrain. Imagery and traffic need no key.
 const CESIUM_ION_TOKEN = "";
 const HUNGARY_RECTANGLE = Cesium.Rectangle.fromDegrees(16.0, 45.6, 23.1, 48.8);
-const TRAFFIC_CENTER = { lat: 47.16, lon: 19.5, radiusNm: 250 };
+const TRAFFIC_CENTER = { lat: 47.16, lon: 19.5, radiusNm: 150 };
 const POLL_MS = 4_000;
 const MAX_HISTORY = 24;
 const HISTORY_MIN_DISTANCE_M = 180;
