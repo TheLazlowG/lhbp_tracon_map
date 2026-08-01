@@ -315,6 +315,10 @@
             </label>
             
             <label class="radar-ui-control">
+                <input type="checkbox" id="show-ground-traffic" checked> SHOW GROUND ACFT
+            </label>
+            
+            <label class="radar-ui-control">
                 <input type="checkbox" id="callsign-format-long" checked> TELEPHONY CALLSIGNS
             </label>
             
@@ -504,18 +508,6 @@
         // Telephony Translation Cache & Utilities
         // ==========================================
         const AIRLINE_TELEPHONY = {
-            "RYR": "RYANAIR", "WZZ": "WIZZAIR", "WMT": "WIZZMALTA", "UTN": "UT-UKRAINE", "VJA": "ICONIC",
-            "EJU": "ALPINE", "EZY": "EASY", "EZS": "TOPSWISS", "TKJ": "ANATOLIA", "HUA": "HUNGARY", 
-            "DLH": "LUFTHANSA","KLM": "KLM", "AFR": "AIR FRANCE", "BEL": "BEELINE", "CSS": "SHUN FENG",
-            "BAW": "SPEEDBIRD","THY": "TURKISH", "UAE": "EMIRATES", "MGH": "MAVI", "HYT": "QUICK AIR",
-            "QTR": "QATARI", "SWR": "SWISS", "AUA": "AUSTRIAN", "JSD": "ALPOK", "FUU":"BLUE SPARROW",
-            "FIN": "FINNAIR", "SAS": "SCANDINAVIAN","NOR": "NORSE", "NSZ": "REDNOSE","AGR":"ACE EUROPE",
-            "NAX": "NORWEGIAN","NOZ": "NORDIC","EXS": "JETEX", "BTI": "AIRBALTIC", "AOJ":"ASTERIX",
-            "LOT": "LOT", "TAP": "AIR PORTUGAL","IBE": "IBERIA", "AWH":"AEROWEST","HKC":"MASCOT",
-            "VLG": "VUELING", "AEA": "AEGEAN", "AEE": "AEGEAN", "CGF":"CLEVER","LHX":"CITYAIR",
-            "MSC": "AIR CAIRO","DAL": "DELTA", "AAL": "AMERICAN", "TOM":"TOMJET","BRK":"BARTOK",
-            "UAL": "UNITED", "ACA": "AIR CANADA","AAE": "EUROVIKING","BBG":"BLUE BIRD",
-            "FDX": "FEDEX", "UPS": "UPS","TVQ": "SLOVAKTRAVEL","BCS":"POSTMAN"
         };
 
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
@@ -1068,6 +1060,7 @@
                 callsign: callsign,
                 actype: "UNK",
                 latestAlt: 0,
+                onGround: false,
                 srcType: srcType || "OTHER",
                 telemetry: [],
                 historyDots: [],
@@ -1112,6 +1105,7 @@
                 state.callsign = t.call;
                 state.actype = t.type || "UNK";
                 state.latestAlt = t.alt;
+                state.onGround = !!t.onGround;
                 state.srcType = t.srcType || "OTHER";
 
                 const lastData = state.telemetry[state.telemetry.length - 1];
@@ -1158,6 +1152,7 @@
         function applyFiltering() {
             const limitFL = parseInt(document.getElementById('alt-filter-slider').value, 10);
             const trafficLayerActive = document.getElementById('layer-traffic').checked;
+            const showGroundTraffic = document.getElementById('show-ground-traffic').checked;
 
             const showMlat = document.getElementById('src-mlat').checked;
             const showOther = document.getElementById('src-other').checked;
@@ -1170,7 +1165,9 @@
                 if (state.srcType === 'MLAT' && showMlat) matchesHardwareFilter = true;
                 else if (state.srcType === 'OTHER' && showOther) matchesHardwareFilter = true;
 
-                if (trafficLayerActive && fl <= limitFL && matchesHardwareFilter) {
+                const matchesGroundFilter = showGroundTraffic || !state.onGround;
+
+                if (trafficLayerActive && fl <= limitFL && matchesHardwareFilter && matchesGroundFilter) {
                     if (!trafficGroup.hasLayer(state.featureGroup)) {
                         trafficGroup.addLayer(state.featureGroup);
                     }
@@ -1188,6 +1185,13 @@
 
             const searchInput = document.getElementById('radar-search');
             const searchQuery = searchInput ? searchInput.value.toUpperCase().trim() : "";
+
+            // Leader lines should stay a constant length on screen regardless of zoom level.
+            // Convert a target on-screen pixel length into NM using the map's current
+            // meters-per-pixel resolution at the current zoom.
+            const LEADER_LINE_PX = 28;
+            const metersPerPixel = 40075016.686 * Math.abs(Math.cos((map.getCenter().lat * Math.PI) / 180)) / Math.pow(2, map.getZoom() + 8);
+            const leaderLineNM = (LEADER_LINE_PX * metersPerPixel) / 1852;
 
             Object.keys(aircraftState).forEach(id => {
                 const state = aircraftState[id];
@@ -1242,23 +1246,28 @@
                 state.ui.marker.setLatLng(currentPos).setOpacity(1);
                 state.ui.hitArea.setLatLng(currentPos);
 
-                if (interpSpd > 30) {
-                    const distanceNM = (interpSpd / 60) * PREDICT_MINUTES;
-                    const projectedPos = getOffsetPoint(currentPos, distanceNM, interpHdg);
-                    state.ui.speedLine.setLatLngs([currentPos, projectedPos]).setStyle({opacity: 0.8});
+                if (interpSpd > 30 || state.onGround) {
+                    if (interpSpd > 30) {
+                        const distanceNM = (interpSpd / 60) * PREDICT_MINUTES;
+                        const projectedPos = getOffsetPoint(currentPos, distanceNM, interpHdg);
+                        state.ui.speedLine.setLatLngs([currentPos, projectedPos]).setStyle({opacity: 0.8});
+                    } else {
+                        state.ui.speedLine.setStyle({opacity: 0});
+                    }
                     
-                    const leaderEnd = getOffsetPoint(currentPos, 1.5, 45); 
+                    const leaderEnd = getOffsetPoint(currentPos, leaderLineNM, 45); 
                     state.ui.leaderLine.setLatLngs([currentPos, leaderEnd]).setStyle({opacity: 0.5});
                     state.ui.dataBlock.setLatLng(leaderEnd);
 
                     const isBelowTA = interpAlt < 10000;
                     const altPrefix = isBelowTA ? 'A' : 'F';
-                    const flStr = Math.round(interpAlt / 100).toString().padStart(3, '0');
+                    const flStr = state.onGround ? 'GND' : Math.round(interpAlt / 100).toString().padStart(3, '0');
+                    const altLabel = state.onGround ? flStr : `${altPrefix}${flStr}`;
                     const spdStr = Math.round(interpSpd).toString().padStart(3, '0');
                     const labelCallsign = getFormattedCallsign(state.callsign, useLongFormat);
                     
                     let trend = "";
-                    if (state.telemetry.length > 1) {
+                    if (!state.onGround && state.telemetry.length > 1) {
                         const oldest = state.telemetry[0];
                         const diff = interpAlt - oldest.alt;
                         if (diff > 50) trend = "▲";
@@ -1275,7 +1284,7 @@
                     const acTypeColor   = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,0.5)';
 
                     const blockHTML = `<div style="color:${callsignColor}; font-weight:${isAircraftMatched ? 'bold' : 'normal'};">${labelCallsign}</div>` +
-                                      `<div style="color:${dataLineColor};">${altPrefix}${flStr}${trend} &nbsp;${spdStr}</div>` +
+                                      `<div style="color:${dataLineColor};">${altLabel}${trend} &nbsp;${spdStr}</div>` +
                                       `<div style="color:${acTypeColor};">${state.actype}</div>`;
                     
                     if (state.lastHTML !== blockHTML) {
@@ -1299,7 +1308,9 @@
             const targets = [];
             data.ac.forEach(ac => {
                 if (!ac.lat || !ac.lon || !inRadarBox(ac.lat, ac.lon)) return;
-                if (ac.alt_baro === 'ground') return;
+                if (ac.t && ac.t.trim().toUpperCase() === 'TWR') return;
+                
+                const onGround = ac.alt_baro === 'ground';
                 
                 let srcType = 'OTHER';
                 
@@ -1316,6 +1327,7 @@
                     lat: ac.lat,
                     lon: ac.lon,
                     alt: typeof ac.alt_baro === 'number' ? Math.round(ac.alt_baro) : 0,
+                    onGround: onGround,
                     spd: ac.gs ? Math.round(ac.gs) : 0,
                     hdg: ac.track ?? ac.true_heading ?? ac.mag_heading ?? 0,
                     type: ac.t ? ac.t.trim().toUpperCase() : 'UNK',
@@ -1367,6 +1379,9 @@
         ['src-mlat', 'src-other'].forEach(id => {
             document.getElementById(id).addEventListener('change', applyFiltering);
         });
+
+        // Ground Traffic Visibility Toggle
+        document.getElementById('show-ground-traffic').addEventListener('change', applyFiltering);
 
         // UI Layer Visibility Selectors
         const toggles = {
