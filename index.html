@@ -88,8 +88,14 @@
         }
 
         /* Reset View Button */
+        .radar-view-btn-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
         .radar-reset-btn {
-            width: 100%;
+            flex: 1;
+            width: auto;
             background: #141414;
             border: 1px solid rgba(255, 255, 255, 0.4);
             color: #8A8A8A;
@@ -102,7 +108,7 @@
             box-sizing: border-box;
             border-radius: 2px;
             cursor: pointer;
-            margin-bottom: 14px;
+            margin-bottom: 0;
         }
         .radar-reset-btn:hover {
             color: #ffffff;
@@ -165,6 +171,53 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin: 10px 0 4px 0;
+        }
+        .taxiway-label {
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 12px;
+            font-family: 'Noto Sans Mono', monospace;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.9);
+            pointer-events: none;
+        }
+        .stand-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
+        .stand-marker .stand-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255, 200, 60, 0.85);
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+        }
+        .stand-marker .stand-label {
+            margin-top: 1px;
+            font-size: 10px;
+            font-family: 'Noto Sans Mono', monospace;
+            font-weight: normal;
+            color: rgba(255, 200, 60, 0.9);
+            white-space: nowrap;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.95);
+        }
+        .leaflet-tooltip.airspace-tooltip {
+            background: rgba(10, 14, 18, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #E0F7FF;
+            font-family: 'Noto Sans Mono', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            padding: 4px 7px;
+            box-shadow: none;
+        }
+        .leaflet-tooltip.airspace-tooltip::before {
+            display: none;
         }
         .radar-ui-control {
             display: flex;
@@ -301,7 +354,10 @@
     <div class="radar-ui-wrapper" id="radar-ui-wrapper">
         <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
         <div class="radar-ui-panel">
-            <button type="button" id="reset-view-btn" class="radar-reset-btn">Reset View</button>
+            <div class="radar-view-btn-row">
+                <button type="button" id="reset-view-btn" class="radar-reset-btn">TMA View</button>
+                <button type="button" id="arpt-view-btn" class="radar-reset-btn">ARPT View</button>
+            </div>
 
             <div class="radar-ui-title">Radar Search</div>
             <div class="radar-search-container">
@@ -355,7 +411,60 @@
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
             </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-ground-features" checked> GROUND FEATURES
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-stands"> STANDS
+            </label>
             <input type="checkbox" id="multi-select-tracks" checked style="display:none;">
+
+            <div class="radar-ui-section">Airspaces</div>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-prohibited" checked> PROHIBITED
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-restricted" checked> RESTRICTED
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-danger" checked> DANGER
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-fir"> FIR
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-cta"> CTA
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-tma"> TMA
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-ctr"> CTR
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-mctr"> MCTR
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-mtma"> MTMA
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-rmz"> RMZ/TMZ
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-tra"> TRA
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-glider"> GLIDER
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-dropzone"> DROPZONE
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-aerobatics"> AEROBATICS
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-airspace-other"> OTHER
+            </label>
 
             <div class="radar-ui-section">Weather</div>
             <label class="radar-ui-control">
@@ -417,10 +526,13 @@
         });
 
         // ==========================================
-        // Reset View Button
+        // View Preset Buttons
         // ==========================================
         document.getElementById('reset-view-btn').addEventListener('click', function() {
             map.setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
+        });
+        document.getElementById('arpt-view-btn').addEventListener('click', function() {
+            map.setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM + 5);
         });
 
         // ==========================================
@@ -508,6 +620,7 @@
         // Telephony Translation Cache & Utilities
         // ==========================================
         const AIRLINE_TELEPHONY = {
+            "RYR": "RYANAIR", "WZZ": "WIZZAIR"
         };
 
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
@@ -560,6 +673,23 @@
             zoomControl: false,
             attributionControl: false
         }).setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
+
+        // Dedicated panes so ground-feature fills (aprons/taxiways/runway fills),
+        // taxiway centerlines, and the bright runway centerlines stack in a
+        // fixed, predictable order regardless of the order layers are added or
+        // re-added (e.g. toggling the "GROUND FEATURES" checkbox off/on):
+        //   basemap (200) < apronsPane (340) < taxiwaysFillPane (345) < runwayFillPane (350)
+        //   < taxiwayLinesPane (380) < runwayLinesPane (390) < overlayPane (400, default: traffic/waypoints/etc.)
+        map.createPane('apronsPane');
+        map.getPane('apronsPane').style.zIndex = 340;
+        map.createPane('taxiwaysFillPane');
+        map.getPane('taxiwaysFillPane').style.zIndex = 345;
+        map.createPane('runwayFillPane');
+        map.getPane('runwayFillPane').style.zIndex = 350;
+        map.createPane('taxiwayLinesPane');
+        map.getPane('taxiwayLinesPane').style.zIndex = 380;
+        map.createPane('runwayLinesPane');
+        map.getPane('runwayLinesPane').style.zIndex = 390;
         
         // Define CartoDB Basemap Variants (With Labels & No Labels)
         const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
@@ -667,10 +797,13 @@
         const rwy31R = [47.4230, 19.2939]; 
 
         // 3. Complete Master Waypoints
-        const waypoints = {
-            "ABONY": [47.19083, 20.01056], "ALZUR": [47.74256, 18.95719], "ANEXA": [47.85470, 18.48610],
-            "ARFOX": [47.97440, 18.57420], "ATICO": [47.22286, 19.40292], "BADOV": [48.02111, 18.81583],
-            "BEREV": [47.40414, 19.50589], "BETED": [48.08330, 20.23330], "BP328": [47.32186, 19.39489],
+        // Local/procedure-only fix points (SID/STAR internal turn points like BPxxx,
+        // runway thresholds, and named fixes not covered by the AIP ENR 4.4.1 FRA
+        // significant points table). Real published named fixes come from
+        // data/waypoints.json, fetched and merged into `waypoints` at boot.
+        const localWaypoints = {
+            "ALZUR": [47.74256, 18.95719], "ANEXA": [47.85470, 18.48610], "ARFOX": [47.97440, 18.57420],
+            "ATICO": [47.22286, 19.40292], "BEREV": [47.40414, 19.50589], "BP328": [47.32186, 19.39489],
             "BP329": [47.36364, 19.45117], "BP331": [47.37586, 19.36978], "BP701": [47.38831, 19.38439],
             "BP702": [47.58806, 19.71853], "BP703": [47.78847, 19.39597], "BP704": [47.96808, 19.10353],
             "BP705": [47.93822, 19.60047], "BP711": [47.36628, 19.35417], "BP712": [47.19042, 19.01619],
@@ -692,22 +825,16 @@
             "BP865": [47.29486, 19.49986], "BP866": [47.22725, 19.60797], "BP870": [47.82369, 18.82367],
             "BP871": [47.70031, 19.02617], "BP872": [47.59072, 19.20467], "BP874": [47.44536, 19.43964],
             "BP883": [47.63419, 19.45767], "BP884": [47.55361, 19.59056], "BP885": [47.46686, 19.73292],
-            "CATUZ": [47.67583, 19.06614], "DUZLA": [46.95694, 18.73028], "EBAMO": [46.83220, 19.59250],
-            "ECMAN": [47.54208, 18.88594], "EDEMU": [48.17440, 19.80830], "ERGOM": [47.79444, 18.74111],
-            "FAHAZ": [46.88861, 19.04861], "FERER": [47.63694, 19.57194], "FUTNA": [47.15228, 19.69622],
-            "GAZDA": [46.80528, 19.39694], "GELSA": [47.01389, 19.78917], "GIFRA": [47.74656, 18.76619],
-            "GILEP": [47.48339, 18.25878], "HUZTA": [47.60817, 18.77761], "JOZEP": [47.18917, 18.74028], 
-            "KATLI": [47.11861, 18.75167], "KENES": [47.04583, 18.39778], "KERET": [47.69750, 18.44194],
-            "KEZAL": [47.15360, 20.23140], "LAHOR": [47.83167, 19.72806], "LITKU": [48.23053, 19.59853],
-            "LUCLA": [47.69619, 19.54222], "MAMOR": [47.53389, 19.98972], "MEZOS": [47.28861, 18.42306],
-            "NARKA": [47.83917, 19.82500], "NICRA": [47.35619, 19.58272], "OCRIT": [47.33503, 19.94539],
-            "ODVAS": [47.27083, 19.32631], "OFENA": [47.16278, 19.71058], "PUCOG": [47.41561, 18.59189],
-            "PUSTA": [47.45667, 18.17222], "RW13L": [47.44542, 19.25756], "RW13R": [47.44869, 19.22075],
-            "RW31L": [47.43047, 19.25025], "RW31R": [47.42294, 19.29386], "SOROS": [47.84278, 19.32611],
-            "TORAZ": [47.73603, 18.75164], "TPS":   [47.49325, 19.44622], "ULPAX": [47.52561, 19.31019],
-            "ULZAK": [46.99420, 18.56690], "UTCON": [47.28850, 19.69083], "VAJDI": [47.37560, 18.28580],
-            "VALVO": [47.60694, 19.69167], "VETIK": [47.35278, 20.23250], "WITRI": [48.14833, 20.12000],
-            "WONTA": [47.15533, 19.51103], "ZURFA": [47.39778, 19.84583]
+            "CATUZ": [47.67583, 19.06614], "ECMAN": [47.54208, 18.88594], "FERER": [47.63694, 19.57194],
+            "FUTNA": [47.15228, 19.69622], "GELSA": [47.01389, 19.78917], "GIFRA": [47.74656, 18.76619],
+            "HUZTA": [47.60817, 18.77761], "KATLI": [47.11861, 18.75167], "KENES": [47.04583, 18.39778],
+            "KERET": [47.69750, 18.44194], "LUCLA": [47.69619, 19.54222], "MAMOR": [47.53389, 19.98972],
+            "MEZOS": [47.28861, 18.42306], "NICRA": [47.35619, 19.58272], "OCRIT": [47.33503, 19.94539],
+            "ODVAS": [47.27083, 19.32631], "OFENA": [47.16278, 19.71058], "RW13L": [47.44542, 19.25756],
+            "RW13R": [47.44869, 19.22075], "RW31L": [47.43047, 19.25025], "RW31R": [47.42294, 19.29386],
+            "SOROS": [47.84278, 19.32611], "TORAZ": [47.73603, 18.75164], "TPS": [47.49325, 19.44622],
+            "ULPAX": [47.52561, 19.31019], "UTCON": [47.28850, 19.69083], "VALVO": [47.60694, 19.69167],
+            "WONTA": [47.15533, 19.51103]
         };
 
         // Monochromatic Layer Configurations
@@ -721,15 +848,72 @@
         const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5 };
         const holdingStyle = { color: '#ffffff', weight: 1.2, opacity: 0.4 };
 
+        // Airspace boundary styles - one per airspace type so each can be
+        // tweaked independently later. Prohibited/Restricted/Danger areas
+        // use red outlines (solid/dashed/dotted respectively) since they
+        // carry the highest operational significance; everything else uses
+        // a neutral gray outline.
+        const airspaceProhibitedStyle = { color: '#FF3B30', weight: 3, opacity: 0.85, fill: false };
+        const airspaceRestrictedStyle = { color: '#FF3B30', weight: 2, opacity: 0.75, fill: false, dashArray: '6, 4' };
+        const airspaceDangerStyle = { color: '#FF3B30', weight: 2, opacity: 0.75, fill: false, dashArray: '1, 4', lineCap: 'round' };
+        const airspaceFirStyle = { color: '#9E9E9E', weight: 1.4, opacity: 0.55, fill: false };
+        const airspaceCtaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceTmaStyle = { color: '#9E9E9E', weight: 1.5, opacity: 0.45, fill: false };
+        const airspaceCtrStyle = { color: '#9E9E9E', weight: 1.5, opacity: 0.45, fill: false };
+        const airspaceMctrStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceMtmaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceRmzStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceTraStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceGliderStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceDropzoneStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceAerobaticsStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceOtherStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+
+        const taxiwayStyle = { stroke: false, fillColor: '#2B2B2B', fillOpacity: 1, pane: 'taxiwaysFillPane' };
+        const apronStyle = { stroke: false, fillColor: '#242424', fillOpacity: 1, pane: 'apronsPane' };
+        const runwayFillStyle = { stroke: false, fillColor: '#3A3A3A', fillOpacity: 1, pane: 'runwayFillPane' };
+        const taxiwayLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.55, pane: 'taxiwayLinesPane' };
+
         // Permanent Element Layer: Main Physical Runways
-        L.polyline([rwy13R, rwy31L], runwayStyle).addTo(map);
-        L.polyline([rwy13L, rwy31R], runwayStyle).addTo(map);
+        L.polyline([rwy13R, rwy31L], {...runwayStyle, pane: 'runwayLinesPane'}).addTo(map);
+        L.polyline([rwy13L, rwy31R], {...runwayStyle, pane: 'runwayLinesPane'}).addTo(map);
 
         // Define Toggleable Leaflet Layer Groups
         const trafficGroup = L.layerGroup().addTo(map);
         const waypointsGroup = L.layerGroup().addTo(map);
         const extensionsGroup = L.layerGroup().addTo(map);
         const holdingGroup = L.layerGroup(); 
+
+        // Airspace sublayers, one per type, so each can be toggled
+        // independently in the settings panel. Prohibited/Restricted/Danger
+        // are visible by default; the rest start hidden.
+        const airspaceProhibitedGroup = L.layerGroup().addTo(map);
+        const airspaceRestrictedGroup = L.layerGroup().addTo(map);
+        const airspaceDangerGroup = L.layerGroup().addTo(map);
+        const airspaceFirGroup = L.layerGroup();
+        const airspaceCtaGroup = L.layerGroup();
+        const airspaceTmaGroup = L.layerGroup();
+        const airspaceCtrGroup = L.layerGroup();
+        const airspaceMctrGroup = L.layerGroup();
+        const airspaceMtmaGroup = L.layerGroup();
+        const airspaceRmzGroup = L.layerGroup();
+        const airspaceTraGroup = L.layerGroup();
+        const airspaceGliderGroup = L.layerGroup();
+        const airspaceDropzoneGroup = L.layerGroup();
+        const airspaceAerobaticsGroup = L.layerGroup();
+        const airspaceOtherGroup = L.layerGroup();
+        const taxiwaysGroup = L.layerGroup();
+        const apronsGroup = L.layerGroup();
+        const runwaysGroup = L.layerGroup();
+        const taxiwayLinesGroup = L.layerGroup();
+        const taxiwayLabelsGroup = L.layerGroup();
+        const standsGroup = L.layerGroup();
+
+        // Master group: bundles all ground-feature sublayers (runway/taxiway/apron
+        // fills, taxiway centerlines, taxiway labels) behind a single toggle.
+        const groundFeaturesGroup = L.layerGroup([
+            runwaysGroup, taxiwaysGroup, apronsGroup, taxiwayLinesGroup
+        ]).addTo(map);
         
         const sid31lGroup = L.layerGroup();
         const sid13lGroup = L.layerGroup(); 
@@ -785,29 +969,48 @@
         // Track and map reference instances of Waypoint Markers for search hooks
         const waypointMarkers = {};
 
-        Object.keys(waypoints).forEach(fixName => {
-            const marker = L.marker(waypoints[fixName], { icon: triangleIcon })
-             .addTo(waypointsGroup);
-             
-             marker.bindTooltip(fixName, {
-                permanent: true,
-                direction: 'top',
-                className: 'fix-label',
-                offset: [0, 8]
+        // Merged runtime waypoint lookup: local/procedure points + AIP-published
+        // named fixes (fetched from data/waypoints.json). Populated by
+        // initWaypointsAndProcedures() before any code below reads from it.
+        let waypoints = {};
+        let wp = {};
+
+        async function initWaypointsAndProcedures() {
+            let aipWaypoints = {};
+            try {
+                const response = await fetch('data/waypoints.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                aipWaypoints = await response.json();
+                console.log(`AIP waypoints loaded: ${Object.keys(aipWaypoints).length} named fixes.`);
+            } catch (err) {
+                console.warn("AIP waypoints (data/waypoints.json) unavailable, using local fix set only:", err);
+            }
+
+            // AIP-published coordinates take precedence where a name exists in both.
+            waypoints = { ...localWaypoints, ...aipWaypoints };
+            wp = waypoints;
+
+            Object.keys(waypoints).forEach(fixName => {
+                const marker = L.marker(waypoints[fixName], { icon: triangleIcon })
+                 .addTo(waypointsGroup);
+                 
+                 marker.bindTooltip(fixName, {
+                    permanent: true,
+                    direction: 'top',
+                    className: 'fix-label',
+                    offset: [0, 8]
+                });
+                
+                waypointMarkers[fixName] = marker;
             });
-            
-            waypointMarkers[fixName] = marker;
-        });
 
-        buildApproachRadar(rwy13R, 312.5, "13R");
-        buildApproachRadar(rwy13L, 312.5, "13L");
-        buildApproachRadar(rwy31L, 132.5, "31L");
-        buildApproachRadar(rwy31R, 132.5, "31R");
+            buildApproachRadar(rwy13R, 312.5, "13R");
+            buildApproachRadar(rwy13L, 312.5, "13L");
+            buildApproachRadar(rwy31L, 132.5, "31L");
+            buildApproachRadar(rwy31R, 132.5, "31R");
 
-        const wp = waypoints;
-
-        // SID 31L
-        L.polyline([rwy31L, wp["BP801"], wp["BP821"], wp["BP822"]], sid31LStyle).addTo(sid31lGroup);
+            // SID 31L
+            L.polyline([rwy31L, wp["BP801"], wp["BP821"], wp["BP822"]], sid31LStyle).addTo(sid31lGroup);
         L.polyline([wp["BP801"], wp["BP802"], wp["BP803"]], sid31LStyle).addTo(sid31lGroup);
         L.polyline([wp["BP801"], wp["BP811"], wp["BP812"]], sid31LStyle).addTo(sid31lGroup);
         L.polyline([wp["BP803"], wp["BP812"], wp["VETIK"]], sid31LStyle).addTo(sid31lGroup);
@@ -853,6 +1056,16 @@
         L.polyline([wp["BETED"], wp["LAHOR"], wp["LUCLA"], wp["BP783"], wp["ULPAX"]], star13Style).addTo(star13Group);
         L.polyline([wp["EDEMU"], wp["LAHOR"]], star13Style).addTo(star13Group);
         L.polyline([wp["ARFOX"], wp["BP786"], wp["BP785"], wp["BP784"], wp["BP783"]], star13Style).addTo(star13Group);
+
+            buildHoldingPattern("JOZEP", 100, true);
+            buildHoldingPattern("HUZTA", 310, false);
+            buildHoldingPattern("ALZUR", 310, true);   
+            buildHoldingPattern("LAHOR", 230, false);
+            buildHoldingPattern("TPS",   246, false);
+            buildHoldingPattern("WONTA", 130, true);   
+            buildHoldingPattern("UTCON", 130, false);
+            buildHoldingPattern("ZURFA", 310, false);
+        }
         
         // ==========================================
         // Real-world Precision Holding Pattern Vectors
@@ -892,15 +1105,6 @@
             points.push(fix);
             L.polyline(points, holdingStyle).addTo(holdingGroup);
         }
-
-        buildHoldingPattern("JOZEP", 100, true);
-        buildHoldingPattern("HUZTA", 310, false);
-        buildHoldingPattern("ALZUR", 310, true);   
-        buildHoldingPattern("LAHOR", 230, false);
-        buildHoldingPattern("TPS",   246, false);
-        buildHoldingPattern("WONTA", 130, true);   
-        buildHoldingPattern("UTCON", 130, false);
-        buildHoldingPattern("ZURFA", 310, false);
 
 
         // ==========================================
@@ -1115,11 +1319,30 @@
 
                     state.trackHistory.push([t.lat, t.lon]);
 
-                    const dot = L.circleMarker([t.lat, t.lon], { radius: 1, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false }).addTo(state.featureGroup);
-                    state.historyDots.push(dot);
-                    if (state.historyDots.length > HISTORY_LENGTH) {
-                        const oldDot = state.historyDots.shift();
-                        state.featureGroup.removeLayer(oldDot);
+                    if (!t.onGround) {
+                        // The rendered aircraft marker lags real time by RENDER_DELAY_MS
+                        // (for smooth interpolation), but history dots are pushed at
+                        // the moment fresh data arrives (real time). If we showed the
+                        // newest dot immediately, it would sit ahead of the marker.
+                        // So we keep the newest dot hidden and only show dots from
+                        // "latest+1" back to "latest+31" (i.e. skip index 0 from the
+                        // end, display the next 30).
+                        const dot = L.circleMarker([t.lat, t.lon], { radius: 1, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false });
+                        state.historyDots.push(dot);
+
+                        // Reveal the previous newest dot now that a newer one has
+                        // taken its place as "latest" (it becomes "latest+1").
+                        if (state.historyDots.length >= 2) {
+                            const toReveal = state.historyDots[state.historyDots.length - 2];
+                            if (!state.featureGroup.hasLayer(toReveal)) {
+                                toReveal.addTo(state.featureGroup);
+                            }
+                        }
+
+                        if (state.historyDots.length > HISTORY_LENGTH + 1) {
+                            const oldDot = state.historyDots.shift();
+                            state.featureGroup.removeLayer(oldDot);
+                        }
                     }
                 }
             });
@@ -1389,6 +1612,22 @@
             'layer-waypoints': waypointsGroup,
             'layer-extensions': extensionsGroup,
             'layer-holding': holdingGroup,
+            'layer-airspace-prohibited': airspaceProhibitedGroup,
+            'layer-airspace-restricted': airspaceRestrictedGroup,
+            'layer-airspace-danger': airspaceDangerGroup,
+            'layer-airspace-fir': airspaceFirGroup,
+            'layer-airspace-cta': airspaceCtaGroup,
+            'layer-airspace-tma': airspaceTmaGroup,
+            'layer-airspace-ctr': airspaceCtrGroup,
+            'layer-airspace-mctr': airspaceMctrGroup,
+            'layer-airspace-mtma': airspaceMtmaGroup,
+            'layer-airspace-rmz': airspaceRmzGroup,
+            'layer-airspace-tra': airspaceTraGroup,
+            'layer-airspace-glider': airspaceGliderGroup,
+            'layer-airspace-dropzone': airspaceDropzoneGroup,
+            'layer-airspace-aerobatics': airspaceAerobaticsGroup,
+            'layer-airspace-other': airspaceOtherGroup,
+            'layer-ground-features': groundFeaturesGroup,
             'layer-sid31l': sid31lGroup,
             'layer-sid13l': sid13lGroup,
             'layer-star31': star31Group,
@@ -1416,6 +1655,42 @@
                 });
             }
         });
+
+        // ==========================================
+        // Zoom-Gated Layers: taxiway labels and stand
+        // markers only render once zoomed in enough to
+        // be legible, in addition to their own checkbox.
+        //   - Taxiway labels: visible from (ARPT view zoom - 1) and up
+        //   - Stands: visible from ARPT view zoom and up
+        // ==========================================
+        const TAXIWAY_LABEL_MIN_ZOOM = (INITIAL_VIEW_ZOOM + 5) - 1;
+        const STANDS_MIN_ZOOM = INITIAL_VIEW_ZOOM + 5;
+
+        function updateZoomGatedLayers() {
+            const currentZoom = map.getZoom();
+
+            const groundFeaturesChecked = document.getElementById('layer-ground-features').checked;
+            const showTaxiwayLabels = groundFeaturesChecked && currentZoom >= TAXIWAY_LABEL_MIN_ZOOM;
+            if (showTaxiwayLabels) {
+                if (!map.hasLayer(taxiwayLabelsGroup)) map.addLayer(taxiwayLabelsGroup);
+            } else {
+                if (map.hasLayer(taxiwayLabelsGroup)) map.removeLayer(taxiwayLabelsGroup);
+            }
+
+            const standsChecked = document.getElementById('layer-stands').checked;
+            const showStands = standsChecked && currentZoom >= STANDS_MIN_ZOOM;
+            if (showStands) {
+                if (!map.hasLayer(standsGroup)) map.addLayer(standsGroup);
+            } else {
+                if (map.hasLayer(standsGroup)) map.removeLayer(standsGroup);
+            }
+        }
+
+        map.on('zoomend', updateZoomGatedLayers);
+        document.getElementById('layer-ground-features').addEventListener('change', updateZoomGatedLayers);
+        document.getElementById('layer-stands').addEventListener('change', updateZoomGatedLayers);
+        // Initial sync in case the map loads already zoomed past a threshold
+        updateZoomGatedLayers();
 
         // Telephony Format Toggle Event Listener
         document.getElementById('callsign-format-long').addEventListener('change', function(e) {
@@ -1467,8 +1742,240 @@
             console.warn('Web Worker unavailable, falling back to setInterval (sweep may go sparse in background tabs):', err);
         }
 
+        // Load ground features (runways/taxiways/aprons) parsed from X-Plane apt.dat
+        async function loadGroundFeatures() {
+            try {
+                const response = await fetch('data/ground-features.geojson');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const geojson = await response.json();
+
+                let runwayCount = 0;
+                let taxiwayCount = 0;
+                let apronCount = 0;
+
+                L.geoJSON(geojson, {
+                    style: function(feature) {
+                        if (feature.properties.category === 'runway') return runwayFillStyle;
+                        return feature.properties.category === 'taxiway' ? taxiwayStyle : apronStyle;
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const cat = feature.properties.category;
+                        let targetGroup;
+                        if (cat === 'runway') {
+                            targetGroup = runwaysGroup;
+                            runwayCount++;
+                        } else if (cat === 'taxiway') {
+                            targetGroup = taxiwaysGroup;
+                            taxiwayCount++;
+                        } else {
+                            targetGroup = apronsGroup;
+                            apronCount++;
+                        }
+                        targetGroup.addLayer(layer);
+                    }
+                });
+
+                console.log(`Ground features loaded: ${runwayCount} runways, ${taxiwayCount} taxiways, ${apronCount} aprons.`);
+            } catch (err) {
+                console.warn("Ground features (data/ground-features.geojson) unavailable:", err);
+            }
+        }
+
+        // Load OSM-derived taxiway centerlines (with real taxiway designators)
+        // and render them as thin white lines with ref labels.
+        async function loadTaxiwayLines() {
+            try {
+                const response = await fetch('data/taxiway-lines.geojson');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const geojson = await response.json();
+
+                let lineCount = 0;
+                let labelCount = 0;
+
+                L.geoJSON(geojson, {
+                    filter: function(feature) {
+                        return feature.geometry.type === 'LineString';
+                    },
+                    style: function() {
+                        return taxiwayLineStyle;
+                    },
+                    onEachFeature: function(feature, layer) {
+                        taxiwayLinesGroup.addLayer(layer);
+                        lineCount++;
+
+                        const ref = feature.properties && feature.properties.ref;
+                        if (ref && layer.getLatLngs) {
+                            const latlngs = layer.getLatLngs();
+                            if (latlngs.length > 0) {
+                                const mid = latlngs[Math.floor(latlngs.length / 2)];
+                                const label = L.marker(mid, {
+                                    pane: 'taxiwayLinesPane',
+                                    interactive: false,
+                                    icon: L.divIcon({
+                                        className: 'taxiway-label',
+                                        html: `<span>${ref}</span>`,
+                                        iconSize: null
+                                    })
+                                });
+                                taxiwayLabelsGroup.addLayer(label);
+                                labelCount++;
+                            }
+                        }
+                    }
+                });
+
+                console.log(`Taxiway lines loaded: ${lineCount} lines, ${labelCount} labels.`);
+            } catch (err) {
+                console.warn("Taxiway lines (data/taxiway-lines.geojson) unavailable:", err);
+            }
+        }
+
+        // Load aircraft parking stand positions (from AIP Parking/Docking Chart
+        // INS coordinates) and render each as a small marker + label.
+        async function loadStands() {
+            try {
+                const response = await fetch('data/stands.geojson');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const geojson = await response.json();
+
+                let count = 0;
+
+                L.geoJSON(geojson, {
+                    pointToLayer: function(feature, latlng) {
+                        const standId = (feature.properties && feature.properties.stand) || '?';
+                        const marker = L.marker(latlng, {
+                            pane: 'taxiwayLinesPane',
+                            interactive: false,
+                            icon: L.divIcon({
+                                className: 'stand-marker',
+                                html: `<div class="stand-dot"></div><div class="stand-label">${standId}</div>`,
+                                iconSize: null
+                            })
+                        });
+                        standsGroup.addLayer(marker);
+                        count++;
+                        return marker;
+                    }
+                });
+
+                console.log(`Stands loaded: ${count} positions.`);
+            } catch (err) {
+                console.warn("Stands (data/stands.geojson) unavailable:", err);
+            }
+        }
+
+        // Load Hungarian airspace boundaries (FIR/CTA/TMA/MCTR/MTMA) from AIP-derived data.
+        // Classify an airspace by name/properties into one of the per-type
+        // groups, returning both the target layer group and its style.
+        // Map from an airspace's "category" property (authoritative, when present)
+        // to its target layer group + style.
+        const AIRSPACE_CATEGORY_MAP = {
+            'prohibited': { group: () => airspaceProhibitedGroup, style: () => airspaceProhibitedStyle },
+            'restricted': { group: () => airspaceRestrictedGroup, style: () => airspaceRestrictedStyle },
+            'danger':     { group: () => airspaceDangerGroup, style: () => airspaceDangerStyle },
+            'fir':        { group: () => airspaceFirGroup, style: () => airspaceFirStyle },
+            'cta':        { group: () => airspaceCtaGroup, style: () => airspaceCtaStyle },
+            'tma':        { group: () => airspaceTmaGroup, style: () => airspaceTmaStyle },
+            'tma_foreign':{ group: () => airspaceTmaGroup, style: () => airspaceTmaStyle },
+            'ctr':        { group: () => airspaceCtrGroup, style: () => airspaceCtrStyle },
+            'mctr':       { group: () => airspaceMctrGroup, style: () => airspaceMctrStyle },
+            'mtma':       { group: () => airspaceMtmaGroup, style: () => airspaceMtmaStyle },
+            'rmz':        { group: () => airspaceRmzGroup, style: () => airspaceRmzStyle },
+            'tmz':        { group: () => airspaceRmzGroup, style: () => airspaceRmzStyle },
+            'tra':        { group: () => airspaceTraGroup, style: () => airspaceTraStyle },
+            'glider':     { group: () => airspaceGliderGroup, style: () => airspaceGliderStyle },
+            'dropzone':   { group: () => airspaceDropzoneGroup, style: () => airspaceDropzoneStyle },
+            'aerobatics': { group: () => airspaceAerobaticsGroup, style: () => airspaceAerobaticsStyle },
+        };
+
+        function classifyAirspace(props) {
+            const category = ((props && props.category) || '').toLowerCase().trim();
+            if (category && AIRSPACE_CATEGORY_MAP[category]) {
+                const entry = AIRSPACE_CATEGORY_MAP[category];
+                return { group: entry.group(), style: entry.style() };
+            }
+
+            // Fallback for data without a "category" property: guess from the name.
+            const name = (props && props.name) || '';
+            const upper = name.toUpperCase();
+
+            if (/\bPROHIBITED\b/.test(upper) || /\bLHP\d/.test(upper)) {
+                return { group: airspaceProhibitedGroup, style: airspaceProhibitedStyle };
+            }
+            if (/\bRESTRICTED\b/.test(upper) || /\bLHR\d/.test(upper)) {
+                return { group: airspaceRestrictedGroup, style: airspaceRestrictedStyle };
+            }
+            if (/\bDANGER\b/.test(upper) || /\bLHD\d/.test(upper)) {
+                return { group: airspaceDangerGroup, style: airspaceDangerStyle };
+            }
+            if (upper.includes('FIR')) {
+                return { group: airspaceFirGroup, style: airspaceFirStyle };
+            }
+            if (upper.includes('MCTR')) {
+                return { group: airspaceMctrGroup, style: airspaceMctrStyle };
+            }
+            if (upper.includes('MTMA')) {
+                return { group: airspaceMtmaGroup, style: airspaceMtmaStyle };
+            }
+            if (upper.includes('CTR')) {
+                return { group: airspaceCtrGroup, style: airspaceCtrStyle };
+            }
+            if (upper.includes('CTA')) {
+                return { group: airspaceCtaGroup, style: airspaceCtaStyle };
+            }
+            if (upper.includes('TMA')) {
+                return { group: airspaceTmaGroup, style: airspaceTmaStyle };
+            }
+            if (upper.includes('RMZ') || upper.includes('TMZ')) {
+                return { group: airspaceRmzGroup, style: airspaceRmzStyle };
+            }
+            if (upper.includes('GLIDER')) {
+                return { group: airspaceGliderGroup, style: airspaceGliderStyle };
+            }
+            return { group: airspaceOtherGroup, style: airspaceOtherStyle };
+        }
+
+        async function loadAirspaces() {
+            try {
+                const response = await fetch('data/airspaces.geojson');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const geojson = await response.json();
+
+                let count = 0;
+
+                L.geoJSON(geojson, {
+                    style: function(feature) {
+                        return classifyAirspace(feature.properties).style;
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const p = feature.properties || {};
+                        if (p.name) {
+                            const lower = p.lower || '?';
+                            const upper = p.upper || '?';
+                            const cls = p.class ? ` (Class ${p.class})` : '';
+                            layer.bindTooltip(
+                                `${p.name}${cls}<br>${lower} - ${upper}`,
+                                { sticky: true, className: 'airspace-tooltip' }
+                            );
+                        }
+                        classifyAirspace(p).group.addLayer(layer);
+                        count++;
+                    }
+                });
+
+                console.log(`Airspaces loaded: ${count} boundaries.`);
+            } catch (err) {
+                console.warn("Airspaces (data/airspaces.geojson) unavailable:", err);
+            }
+        }
+
         async function bootApp() {
+            await initWaypointsAndProcedures();
             await initAirlineDatabase(); 
+            await loadGroundFeatures();
+            await loadTaxiwayLines();
+            await loadStands();
+            await loadAirspaces();
             fetchRadarSweep();
             if (sweepWorker) {
                 sweepWorker.postMessage({ type: 'start', intervalMs: SWEEP_INTERVAL_MS });
