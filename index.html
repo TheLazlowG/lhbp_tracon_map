@@ -338,10 +338,10 @@
         /* ATC Target Square */
         .atc-target-icon {
             background: transparent;
-            border: 1.5px solid #5DEB3D;
+            border: 2.2px solid #5DEB3D;
             border-radius: 50%;
-            width: 4px;
-            height: 4px;
+            width: 7px;
+            height: 7px;
             transform: translate(-50%, -50%);
             box-sizing: border-box;
         }
@@ -412,7 +412,10 @@
                 <input type="checkbox" id="strip-bp-prefix"> STRIP "BP" PREFIX
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-extensions" checked> RWY EXTENSIONS
+                <input type="checkbox" id="layer-extensions-13" checked> RWY 13 EXTENSION
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="layer-extensions-31" checked> RWY 31 EXTENSION
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
@@ -626,7 +629,7 @@
         // Telephony Translation Cache & Utilities
         // ==========================================
         const AIRLINE_TELEPHONY = {
-		"JSD":"ALPOK",
+		"JSD":"ALPOK","SXS":"SUNEXPRESS","AFR":"AIR FRANCE"
         };
 
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
@@ -640,7 +643,14 @@
                 // { "AAD": { "callsign": "PANABEAR", "company": "...", "country": "..." }, ... }
                 Object.keys(data).forEach(icaoKey => {
                     const entry = data[icaoKey];
-                    if (entry && entry.callsign && entry.callsign.trim().toUpperCase() !== "NONE") {
+                    // The database signals "no telephony designator known" as
+                    // the literal string "(None)" (parentheses included).
+                    // Strip any surrounding parens before comparing so this
+                    // also catches "None", "NONE", etc. if the format varies.
+                    const normalizedCallsign = entry && entry.callsign
+                        ? entry.callsign.trim().toUpperCase().replace(/^\(|\)$/g, '')
+                        : '';
+                    if (entry && entry.callsign && normalizedCallsign !== "NONE") {
                         const key = icaoKey.toUpperCase().trim();
                         // Prefer predefined script callsigns if they already exist
                         if (!AIRLINE_TELEPHONY[key]) {
@@ -702,7 +712,11 @@
         // fixed, predictable order regardless of the order layers are added or
         // re-added (e.g. toggling the "GROUND FEATURES" checkbox off/on):
         //   basemap (200) < apronsPane (340) < taxiwaysFillPane (345) < runwayFillPane (350)
-        //   < taxiwayLinesPane (380) < runwayLinesPane (390) < overlayPane (400, default: traffic/waypoints/etc.)
+        //   < taxiwayLinesPane (380) < runwayLinesPane (390) < overlayPane (400, default:
+        //   waypoints/SID-STAR/airspaces/etc.) < ... < markerPane (600, default) <
+        //   tooltipPane (650, default) < aircraftPane (700, traffic: position dots,
+        //   speed vectors, leader lines, data blocks, history trail dots -- always on
+        //   top of every other layer, regardless of add order).
         map.createPane('apronsPane');
         map.getPane('apronsPane').style.zIndex = 340;
         map.createPane('taxiwaysFillPane');
@@ -713,6 +727,8 @@
         map.getPane('taxiwayLinesPane').style.zIndex = 380;
         map.createPane('runwayLinesPane');
         map.getPane('runwayLinesPane').style.zIndex = 390;
+        map.createPane('aircraftPane');
+        map.getPane('aircraftPane').style.zIndex = 700;
         
         // Define CartoDB Basemap Variants (With Labels & No Labels)
         const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
@@ -827,8 +843,9 @@
 
         // Monochromatic Layer Configurations
         const runwayStyle = { color: '#ffffff', weight: 4, opacity: 0.9 };
-        const extensionStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4 };
+        const extensionStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6 };
         const tickLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6 };
+        const majorTickLineStyle = { color: '#ffffff', weight: 2, opacity: 0.8 };
         
         const sid31Style = { color: '#ffffff', weight: 1.5, dashArray: '6, 4', opacity: 0.6 };
         const sid13LStyle = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7 };
@@ -869,7 +886,8 @@
         // Define Toggleable Leaflet Layer Groups
         const trafficGroup = L.layerGroup().addTo(map);
         const waypointsGroup = L.layerGroup().addTo(map);
-        const extensionsGroup = L.layerGroup().addTo(map);
+        const extensions13Group = L.layerGroup().addTo(map);
+        const extensions31Group = L.layerGroup().addTo(map);
         const holdingGroup = L.layerGroup(); 
 
         // Airspace sublayers, one per type, so each can be toggled
@@ -924,9 +942,24 @@
         }
 
         // 5. Generate Solid Centerlines and Directional Outward Range Ticks
+        // Each runway threshold gets an extended centerline running outward
+        // (into the approach path) to 15 NM. The first mile nearest the
+        // runway is intentionally not drawn (extension only becomes visible
+        // starting 1 NM out), and 1 NM tick marks are added out to 10 NM,
+        // with a bigger tick every 5th mile (5 NM, 10 NM), plus a final
+        // major tick right at the 15 NM endpoint.
         function buildApproachRadar(threshold, heading, name) {
-            const endPoint = getOffsetPoint(threshold, 20, heading);
-            L.polyline([threshold, endPoint], extensionStyle).addTo(extensionsGroup);
+            const EXTENSION_LENGTH_NM = 15;
+            const EXTENSION_START_NM = 1;   // last mile near the runway is hidden
+            const TICK_MAX_NM = 10;
+            const MINOR_TICK_LEN_NM = 0.3;
+            const MAJOR_TICK_LEN_NM = 0.6;
+
+            const targetGroup = (name === "13L" || name === "13R") ? extensions13Group : extensions31Group;
+
+            const startPoint = getOffsetPoint(threshold, EXTENSION_START_NM, heading);
+            const endPoint = getOffsetPoint(threshold, EXTENSION_LENGTH_NM, heading);
+            L.polyline([startPoint, endPoint], extensionStyle).addTo(targetGroup);
 
             let tickHeading;
             if (name === "13R") {
@@ -939,11 +972,17 @@
                 tickHeading = (heading - 90 + 360) % 360; 
             }
 
-            for (let miles = 5; miles <= 20; miles += 5) {
+            for (let miles = 1; miles <= TICK_MAX_NM; miles++) {
+                const isMajor = miles % 5 === 0;
                 const tickCoord = getOffsetPoint(threshold, miles, heading);
-                const tickEnd = getOffsetPoint(tickCoord, 0.3, tickHeading); 
-                L.polyline([tickCoord, tickEnd], tickLineStyle).addTo(extensionsGroup);
+                const tickLen = isMajor ? MAJOR_TICK_LEN_NM : MINOR_TICK_LEN_NM;
+                const tickEnd = getOffsetPoint(tickCoord, tickLen, tickHeading);
+                L.polyline([tickCoord, tickEnd], isMajor ? majorTickLineStyle : tickLineStyle).addTo(targetGroup);
             }
+
+            // Final tick at the very end of the extension (15 NM).
+            const endTickEnd = getOffsetPoint(endPoint, MAJOR_TICK_LEN_NM, tickHeading);
+            L.polyline([endPoint, endTickEnd], majorTickLineStyle).addTo(targetGroup);
         }
 
         // 6. Define Triangle Icon for fixes
@@ -1171,6 +1210,8 @@
 			L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP885"], wp["BP884"], wp["BP883"], wp["ULPAX"]], star31Style).addTo(star31Group);
 			L.polyline([wp["EDEMU"], wp["LAHOR"], wp["LUCLA"], wp["BP883"]], star31Style).addTo(star31Group);
 			L.polyline([wp["BETED"], wp["LAHOR"]], star31Style).addTo(star31Group);
+			L.polyline([wp["BP855"], wp["BP856"], wp["FUTNA"]], star31Style).addTo(star31Group);
+			L.polyline([wp["BP865"], wp["BP866"], wp["OFENA"]], star31Style).addTo(star31Group);
 			
 			// STAR 13L/13R
 			L.polyline([wp["EBAMO"], wp["BP741"], wp["BP742"], wp["BP743"], wp["BP744"], wp["ECMAN"], wp["BP755"]], star13Style).addTo(star13Group);
@@ -1181,6 +1222,8 @@
 			L.polyline([wp["BETED"], wp["LAHOR"], wp["LUCLA"], wp["BP783"], wp["ULPAX"]], star13Style).addTo(star13Group);
 			L.polyline([wp["EDEMU"], wp["LAHOR"]], star13Style).addTo(star13Group);
 			L.polyline([wp["ARFOX"], wp["BP786"], wp["BP785"], wp["BP784"], wp["BP783"]], star13Style).addTo(star13Group);
+			L.polyline([wp["BP755"], wp["BP756"], wp["TORAZ"]], star13Style).addTo(star13Group);
+			L.polyline([wp["BP765"], wp["BP766"], wp["GIFRA"]], star13Style).addTo(star13Group);
 
             buildHoldingPattern("JOZEP", 100, true);
             buildHoldingPattern("HUZTA", 310, false);
@@ -1252,7 +1295,7 @@
         trafficStatusEl.textContent = 'Traffic: connecting...';
         document.querySelector('.radar-ui-panel').appendChild(trafficStatusEl);
 
-        const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [8, 8] });
+        const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [11, 11] });
 
         function setTrafficSource(source, statusText, siteDomain) {
             trafficSource = source;
@@ -1297,7 +1340,8 @@
                     weight: 1.5,
                     opacity: 0.85,
                     interactive: false,
-                    lineJoin: 'round'
+                    lineJoin: 'round',
+                    pane: 'aircraftPane'
                 });
                 trackHistoryLines.set(id, line);
             }
@@ -1396,12 +1440,12 @@
                 trackHistory: [],
                 featureGroup: L.featureGroup().addTo(trafficGroup),
                 ui: {
-                    marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0 }),
-                    hitArea: L.circleMarker([0, 0], { radius: 9, opacity: 0, fillOpacity: 0, interactive: true, bubblingMouseEvents: false }),
-                    speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.2, opacity: 0, interactive: false }),
-                    leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1, opacity: 0, interactive: false }),
-                    dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0 })
-                        .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label', offset: [0, -10] })
+                    marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0, pane: 'aircraftPane' }),
+                    hitArea: L.circleMarker([0, 0], { radius: 9, opacity: 0, fillOpacity: 0, interactive: true, bubblingMouseEvents: false, pane: 'aircraftPane' }),
+                    speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 0, interactive: false, pane: 'aircraftPane' }),
+                    leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1, opacity: 0, interactive: false, pane: 'aircraftPane' }),
+                    dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0, pane: 'aircraftPane' })
+                        .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label', offset: [0, -10], pane: 'aircraftPane' })
                 }
             };
             const ui = aircraftState[id].ui;
@@ -1457,7 +1501,7 @@
                         // So we keep the newest dot hidden and only show dots from
                         // "latest+1" back to "latest+31" (i.e. skip index 0 from the
                         // end, display the next 30).
-                        const dot = L.circleMarker([t.lat, t.lon], { radius: 1, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false });
+                        const dot = L.circleMarker([t.lat, t.lon], { radius: 1.5, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false, pane: 'aircraftPane' });
                         state.historyDots.push(dot);
 
                         // Reveal the previous newest dot now that a newer one has
@@ -1753,7 +1797,8 @@
         const toggles = {
             'layer-traffic': trafficGroup,
             'layer-waypoints': waypointsGroup,
-            'layer-extensions': extensionsGroup,
+            'layer-extensions-13': extensions13Group,
+            'layer-extensions-31': extensions31Group,
             'layer-holding': holdingGroup,
             'layer-airspace-prohibited': airspaceProhibitedGroup,
             'layer-airspace-restricted': airspaceRestrictedGroup,
