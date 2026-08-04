@@ -337,10 +337,13 @@
         
         /* ATC Target Square */
         .atc-target-icon {
-            background: #5DEB3D;
+            background: transparent;
+            border: 1.5px solid #5DEB3D;
+            border-radius: 50%;
             width: 4px;
             height: 4px;
             transform: translate(-50%, -50%);
+            box-sizing: border-box;
         }
         .atc-target-icon.selected {
             box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
@@ -371,7 +374,7 @@
             </label>
             
             <label class="radar-ui-control">
-                <input type="checkbox" id="show-ground-traffic" checked> SHOW GROUND ACFT
+                <input type="checkbox" id="show-ground-traffic"> SHOW GROUND ACFT
             </label>
             
             <label class="radar-ui-control">
@@ -406,13 +409,16 @@
                 <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
             </label>
             <label class="radar-ui-control">
+                <input type="checkbox" id="strip-bp-prefix"> STRIP "BP" PREFIX
+            </label>
+            <label class="radar-ui-control">
                 <input type="checkbox" id="layer-extensions" checked> RWY EXTENSIONS
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-ground-features" checked> GROUND FEATURES
+                <input type="checkbox" id="layer-ground-features"> GROUND FEATURES
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-stands"> STANDS
@@ -478,18 +484,18 @@
 
             <div class="radar-ui-section">Departures</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid31l"> SID 31L
+                <input type="checkbox" id="layer-sid31"> SID 31
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid13l"> SID 13L
+                <input type="checkbox" id="layer-sid13"> SID 13
             </label>
 
             <div class="radar-ui-section">Arrivals</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-star31" checked> STAR 31L/31R
+                <input type="checkbox" id="layer-star31" checked> STAR 31
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-star13"> STAR 13L/13R
+                <input type="checkbox" id="layer-star13"> STAR 13
             </label>
 
             <div class="radar-ui-title" style="margin-top: 14px;">LHBP ATC Radio</div>
@@ -620,7 +626,7 @@
         // Telephony Translation Cache & Utilities
         // ==========================================
         const AIRLINE_TELEPHONY = {
-            "RYR": "RYANAIR", "WZZ": "WIZZAIR"
+		"JSD":"ALPOK",
         };
 
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
@@ -634,7 +640,7 @@
                 // { "AAD": { "callsign": "PANABEAR", "company": "...", "country": "..." }, ... }
                 Object.keys(data).forEach(icaoKey => {
                     const entry = data[icaoKey];
-                    if (entry && entry.callsign) {
+                    if (entry && entry.callsign && entry.callsign.trim().toUpperCase() !== "NONE") {
                         const key = icaoKey.toUpperCase().trim();
                         // Prefer predefined script callsigns if they already exist
                         if (!AIRLINE_TELEPHONY[key]) {
@@ -660,6 +666,12 @@
             if (AIRLINE_TELEPHONY[prefix]) {
                 return AIRLINE_TELEPHONY[prefix] + " " + callsign.substring(3);
             }
+            // No known telephony translation for this prefix: keep the
+            // original callsign, just separated with a space (e.g.
+            // "XTS6UY" -> "XTS 6UY") instead of inventing a placeholder.
+            if (/^[A-Za-z]{3}/.test(callsign.trim())) {
+                return prefix + " " + callsign.substring(3);
+            }
             return callsign;
         }
 
@@ -671,7 +683,18 @@
         const INITIAL_VIEW_ZOOM = 9.5;
         const map = L.map('radar-scope', {
             zoomControl: false,
-            attributionControl: false
+            attributionControl: false,
+            // Canvas rendering is dramatically cheaper than the SVG default
+            // once you have thousands of polygon vertices on screen at once
+            // (ground features + airspaces + taxiway lines add up to ~12,000
+            // points combined). SVG creates one DOM node per shape and has to
+            // recompute/repaint every path node on each zoom animation frame,
+            // which is what caused the rendering glitches at certain zoom
+            // levels. Canvas draws everything into one bitmap per frame
+            // instead, and Leaflet still supports tooltips/hover/click on
+            // canvas-rendered shapes (used by the airspace tooltips), so no
+            // interactivity is lost.
+            preferCanvas: true
         }).setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
 
         // Dedicated panes so ground-feature fills (aprons/taxiways/runway fills),
@@ -797,69 +820,34 @@
         const rwy31R = [47.4230, 19.2939]; 
 
         // 3. Complete Master Waypoints
-        // Local/procedure-only fix points (SID/STAR internal turn points like BPxxx,
-        // runway thresholds, and named fixes not covered by the AIP ENR 4.4.1 FRA
-        // significant points table). Real published named fixes come from
-        // data/waypoints.json, fetched and merged into `waypoints` at boot.
-        const localWaypoints = {
-            "ALZUR": [47.74256, 18.95719], "ANEXA": [47.85470, 18.48610], "ARFOX": [47.97440, 18.57420],
-            "ATICO": [47.22286, 19.40292], "BEREV": [47.40414, 19.50589], "BP328": [47.32186, 19.39489],
-            "BP329": [47.36364, 19.45117], "BP331": [47.37586, 19.36978], "BP701": [47.38831, 19.38439],
-            "BP702": [47.58806, 19.71853], "BP703": [47.78847, 19.39597], "BP704": [47.96808, 19.10353],
-            "BP705": [47.93822, 19.60047], "BP711": [47.36628, 19.35417], "BP712": [47.19042, 19.01619],
-            "BP723": [47.25497, 18.89439], "BP733": [47.30597, 19.01456], "BP734": [47.37361, 18.90436],
-            "BP735": [47.45461, 18.77225], "BP736": [47.59628, 18.53928], "BP741": [47.10417, 19.59164],
-            "BP742": [47.21558, 19.41389], "BP743": [47.39200, 19.12992], "BP744": [47.45889, 19.02144],
-            "BP753": [47.40472, 19.29186], "BP754": [47.55436, 19.04922], "BP755": [47.60383, 18.96917],
-            "BP756": [47.67106, 18.85975], "BP763": [47.40142, 19.32861], "BP764": [47.54942, 19.08886],
-            "BP765": [47.61431, 18.98308], "BP766": [47.68133, 18.87336], "BP772": [47.34906, 19.59414],
-            "BP774": [47.59264, 19.20158], "BP783": [47.61136, 19.42658], "BP784": [47.67847, 19.31814],
-            "BP785": [47.76111, 19.18028], "BP786": [47.88178, 18.98692], "BP801": [47.47853, 19.17244],
-            "BP802": [47.65342, 18.95778], "BP803": [47.80253, 19.16431], "BP811": [47.70369, 19.32033],
-            "BP812": [47.81747, 19.47942], "BP813": [48.08153, 19.55533], "BP821": [47.33642, 18.98847],
-            "BP822": [47.09994, 18.82711], "BP834": [47.19161, 19.01328], "BP835": [47.07417, 19.20394],
-            "BP836": [47.00936, 19.30858], "BP837": [46.94203, 19.41686], "BP840": [47.68922, 18.64422],
-            "BP841": [47.60203, 18.78772], "BP842": [47.51908, 18.92350], "BP843": [47.43536, 19.05992],
-            "BP844": [47.34106, 19.21269], "BP854": [47.35983, 19.36419], "BP855": [47.28428, 19.48556],
-            "BP856": [47.21667, 19.59369], "BP863": [47.46694, 19.22272], "BP864": [47.35114, 19.40956],
-            "BP865": [47.29486, 19.49986], "BP866": [47.22725, 19.60797], "BP870": [47.82369, 18.82367],
-            "BP871": [47.70031, 19.02617], "BP872": [47.59072, 19.20467], "BP874": [47.44536, 19.43964],
-            "BP883": [47.63419, 19.45767], "BP884": [47.55361, 19.59056], "BP885": [47.46686, 19.73292],
-            "CATUZ": [47.67583, 19.06614], "ECMAN": [47.54208, 18.88594], "FERER": [47.63694, 19.57194],
-            "FUTNA": [47.15228, 19.69622], "GELSA": [47.01389, 19.78917], "GIFRA": [47.74656, 18.76619],
-            "HUZTA": [47.60817, 18.77761], "KATLI": [47.11861, 18.75167], "KENES": [47.04583, 18.39778],
-            "KERET": [47.69750, 18.44194], "LUCLA": [47.69619, 19.54222], "MAMOR": [47.53389, 19.98972],
-            "MEZOS": [47.28861, 18.42306], "NICRA": [47.35619, 19.58272], "OCRIT": [47.33503, 19.94539],
-            "ODVAS": [47.27083, 19.32631], "OFENA": [47.16278, 19.71058], "RW13L": [47.44542, 19.25756],
-            "RW13R": [47.44869, 19.22075], "RW31L": [47.43047, 19.25025], "RW31R": [47.42294, 19.29386],
-            "SOROS": [47.84278, 19.32611], "TORAZ": [47.73603, 18.75164], "TPS": [47.49325, 19.44622],
-            "ULPAX": [47.52561, 19.31019], "UTCON": [47.28850, 19.69083], "VALVO": [47.60694, 19.69167],
-            "WONTA": [47.15533, 19.51103]
-        };
+        // The full waypoint database (published AIP fixes, VFR reporting points,
+        // and internal SID/STAR/procedure turn points like BPxxx and runway
+        // thresholds) lives entirely in data/waypoints.json, fetched and loaded
+        // into `waypoints` at boot by initWaypointsAndProcedures().
 
         // Monochromatic Layer Configurations
         const runwayStyle = { color: '#ffffff', weight: 4, opacity: 0.9 };
-        const extensionStyle = { color: '#ffffff', weight: 1.2, opacity: 0.4 };
-        const tickLineStyle = { color: '#ffffff', weight: 1.2, opacity: 0.6 };
+        const extensionStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4 };
+        const tickLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6 };
         
-        const sid31LStyle = { color: '#ffffff', weight: 1.2, dashArray: '6, 4', opacity: 0.6 };
-        const sid13LStyle = { color: '#ffffff', weight: 1.2, dashArray: '2, 3', opacity: 0.7 };
+        const sid31Style = { color: '#ffffff', weight: 1.5, dashArray: '6, 4', opacity: 0.6 };
+        const sid13LStyle = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7 };
         const star31Style = { color: '#ffffff', weight: 1.5, dashArray: '10, 4, 2, 4', opacity: 0.6 };
         const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5 };
-        const holdingStyle = { color: '#ffffff', weight: 1.2, opacity: 0.4 };
+        const holdingStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4 };
 
         // Airspace boundary styles - one per airspace type so each can be
         // tweaked independently later. Prohibited/Restricted/Danger areas
         // use red outlines (solid/dashed/dotted respectively) since they
         // carry the highest operational significance; everything else uses
         // a neutral gray outline.
-        const airspaceProhibitedStyle = { color: '#FF3B30', weight: 3, opacity: 0.85, fill: false };
-        const airspaceRestrictedStyle = { color: '#FF3B30', weight: 2, opacity: 0.75, fill: false, dashArray: '6, 4' };
-        const airspaceDangerStyle = { color: '#FF3B30', weight: 2, opacity: 0.75, fill: false, dashArray: '1, 4', lineCap: 'round' };
+        const airspaceProhibitedStyle = { color: '#FF3B30', weight: 1.4, opacity: 0.85, fill: false };
+        const airspaceRestrictedStyle = { color: '#FF3B30', weight: 1.2, opacity: 0.75, fill: false, dashArray: '6, 4' };
+        const airspaceDangerStyle = { color: '#FF3B30', weight: 1.2, opacity: 0.75, fill: false, dashArray: '1, 4', lineCap: 'round' };
         const airspaceFirStyle = { color: '#9E9E9E', weight: 1.4, opacity: 0.55, fill: false };
         const airspaceCtaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceTmaStyle = { color: '#9E9E9E', weight: 1.5, opacity: 0.45, fill: false };
-        const airspaceCtrStyle = { color: '#9E9E9E', weight: 1.5, opacity: 0.45, fill: false };
+        const airspaceTmaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceCtrStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
         const airspaceMctrStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
         const airspaceMtmaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
         const airspaceRmzStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
@@ -915,7 +903,7 @@
             runwaysGroup, taxiwaysGroup, apronsGroup, taxiwayLinesGroup
         ]).addTo(map);
         
-        const sid31lGroup = L.layerGroup();
+        const sid31Group = L.layerGroup();
         const sid13lGroup = L.layerGroup(); 
         const star31Group = L.layerGroup();
         const star13Group = L.layerGroup();
@@ -975,26 +963,33 @@
         let waypoints = {};
         let wp = {};
 
+        // Returns the display label for a waypoint, optionally stripping a
+        // leading "BP" prefix (internal procedure-point naming convention)
+        // when the "STRIP BP PREFIX" checkbox is checked.
+        function getWaypointLabel(fixName) {
+            const stripBp = document.getElementById('strip-bp-prefix').checked;
+            if (stripBp && /^BP/.test(fixName)) {
+                return fixName.slice(2);
+            }
+            return fixName;
+        }
+
         async function initWaypointsAndProcedures() {
-            let aipWaypoints = {};
             try {
                 const response = await fetch('data/waypoints.json');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                aipWaypoints = await response.json();
-                console.log(`AIP waypoints loaded: ${Object.keys(aipWaypoints).length} named fixes.`);
+                waypoints = await response.json();
+                console.log(`Waypoint database loaded: ${Object.keys(waypoints).length} fixes.`);
             } catch (err) {
-                console.warn("AIP waypoints (data/waypoints.json) unavailable, using local fix set only:", err);
+                console.error("Waypoint database (data/waypoints.json) failed to load:", err);
             }
-
-            // AIP-published coordinates take precedence where a name exists in both.
-            waypoints = { ...localWaypoints, ...aipWaypoints };
             wp = waypoints;
 
             Object.keys(waypoints).forEach(fixName => {
                 const marker = L.marker(waypoints[fixName], { icon: triangleIcon })
                  .addTo(waypointsGroup);
                  
-                 marker.bindTooltip(fixName, {
+                 marker.bindTooltip(getWaypointLabel(fixName), {
                     permanent: true,
                     direction: 'top',
                     className: 'fix-label',
@@ -1009,53 +1004,183 @@
             buildApproachRadar(rwy31L, 132.5, "31L");
             buildApproachRadar(rwy31R, 132.5, "31R");
 
+            // Bearing (great-circle initial course) from point a to point b, in degrees.
+            function getBearing(a, b) {
+                const lat1 = (a[0] * Math.PI) / 180;
+                const lat2 = (b[0] * Math.PI) / 180;
+                const dLon = ((b[1] - a[1]) * Math.PI) / 180;
+                const y = Math.sin(dLon) * Math.cos(lat2);
+                const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+            }
+
+            // Planar (flat-earth) distance in NM between two [lat,lon] points.
+            // Fine at this map's scale (a few dozen NM) and much simpler than
+            // full great-circle trig for the tangent-circle construction below.
+            function planarDistanceNM(a, b) {
+                const NM_PER_DEG_LAT = 60;
+                const nmPerDegLon = 60 * Math.cos((a[0] * Math.PI) / 180);
+                const dy = (b[0] - a[0]) * NM_PER_DEG_LAT;
+                const dx = (b[1] - a[1]) * nmPerDegLon;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            // Draws a procedure (SID/STAR) as a sequence of legs between points.
+            // `points` is an array where each entry is either:
+            //   - a plain [lat,lon] pair or a fix-name string ("BP821") for a
+            //     normal fly-by vertex (sharp corner, straight legs in/out), or
+            //   - { at: "BP821", overfly: { inbound: 200, turn: "R", radius: 1.2 } }
+            //     for a DF (direct-to-fix) overfly point: the track curves at
+            //     constant `radius` (NM) in the `turn` direction ("L"/"R"),
+            //     starting from `inbound` course, until it points directly at
+            //     the NEXT point in the array -- then a straight leg is flown
+            //     from that roll-out point to the next fix.
+            // Requires an overfly point to have a next point to aim at; the
+            // last point in a procedure cannot itself be an overfly point.
+            function resolvePoint(entry) {
+                if (typeof entry === 'string') return wp[entry];
+                if (Array.isArray(entry)) return entry;
+                if (entry && entry.at) {
+                    return typeof entry.at === 'string' ? wp[entry.at] : entry.at;
+                }
+                return null;
+            }
+
+            function drawProcedure(points, style, group) {
+                const line = [];
+
+                for (let i = 0; i < points.length; i++) {
+                    const entry = points[i];
+                    const fixPos = resolvePoint(entry);
+                    if (!fixPos) continue;
+
+                    const isOverfly = entry && typeof entry === 'object' && !Array.isArray(entry) && entry.overfly;
+
+                    if (!isOverfly || i === points.length - 1) {
+                        // Normal fly-by vertex (or an overfly point with nothing
+                        // after it, which can't curve) -- just add it as-is.
+                        line.push(fixPos);
+                        continue;
+                    }
+
+                    const nextPos = resolvePoint(points[i + 1]);
+                    if (!nextPos) {
+                        line.push(fixPos);
+                        continue;
+                    }
+
+                    const { inbound, turn, radius } = entry.overfly;
+                    const turnSign = turn === 'R' ? 1 : -1;
+
+                    // Turn center: offset from the fix, perpendicular to the
+                    // inbound course, toward the turn direction.
+                    const centerBearing = (inbound + turnSign * 90 + 360) % 360;
+                    const center = getOffsetPoint(fixPos, radius, centerBearing);
+
+                    const d = planarDistanceNM(center, nextPos);
+
+                    if (d <= radius) {
+                        // Degenerate case (next fix is inside the turn circle) --
+                        // fall back to a straight line, nothing sane to draw.
+                        line.push(fixPos);
+                        continue;
+                    }
+
+                    // Tangent line from `center` to `nextPos`: the roll-out point
+                    // is where a line from nextPos, tangent to the turn circle,
+                    // touches the circle -- solved via the standard external
+                    // tangent construction (right triangle: hypotenuse d,
+                    // opposite side radius, so the half-angle at nextPos is
+                    // asin(radius/d)).
+                    const bearingCenterToNext = getBearing(center, nextPos);
+                    const halfAngle = (Math.asin(radius / d) * 180) / Math.PI;
+                    // The tangent point sits `(90 - halfAngle)` degrees around
+                    // the circle from the center->next bearing, on the side
+                    // consistent with the turn direction.
+                    const tangentPointBearing = (bearingCenterToNext - turnSign * (90 - halfAngle) + 360) % 360;
+                    const rollOutPoint = getOffsetPoint(center, radius, tangentPointBearing);
+
+                    // Sweep the arc from the fix (which sits on the circle at
+                    // the inbound-tangent point) to the roll-out point, in the
+                    // turn direction, picking the shorter way round.
+                    const startAngle = (centerBearing + 180) % 360; // bearing from center to fix
+                    let endAngle = tangentPointBearing;
+                    let sweep = turnSign * (endAngle - startAngle);
+                    sweep = ((sweep % 360) + 360) % 360;
+                    // If the naive sweep is the "long way" (>180), the true turn
+                    // is the short way in the opposite rotational sense for this
+                    // segment only -- but by construction (turnSign fixed) this
+                    // shouldn't happen for realistic geometry, so no correction
+                    // needed here.
+
+                    const ARC_STEPS = 16;
+                    for (let s = 0; s <= ARC_STEPS; s++) {
+                        const a = (startAngle + turnSign * (sweep * s / ARC_STEPS) + 720) % 360;
+                        line.push(getOffsetPoint(center, radius, a));
+                    }
+                    line.push(rollOutPoint);
+                    // Straight leg from roll-out point to the next fix is
+                    // implicit: the next loop iteration adds nextPos itself.
+                }
+
+                L.polyline(line, style).addTo(group);
+            }
+
             // SID 31L
-            L.polyline([rwy31L, wp["BP801"], wp["BP821"], wp["BP822"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP801"], wp["BP802"], wp["BP803"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP801"], wp["BP811"], wp["BP812"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP803"], wp["BP812"], wp["VETIK"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP803"], wp["WITRI"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP812"], wp["WITRI"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP803"], wp["BP813"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP803"], wp["BADOV"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP821"], wp["PUCOG"], wp["GILEP"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP822"], wp["DUZLA"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP822"], wp["FAHAZ"]], sid31LStyle).addTo(sid31lGroup);
-        L.polyline([wp["BP822"], wp["GAZDA"]], sid31LStyle).addTo(sid31lGroup);
+            L.polyline([rwy13R, wp["BP801"]], sid31Style).addTo(sid31Group);
+            L.polyline([rwy13L, wp["BP801"]], sid31Style).addTo(sid31Group);
+			drawProcedure([{ at: "BP801", overfly: { inbound: 310, turn: "L", radius: 2.5 } },"BP821", "BP822"], sid31Style, sid31Group);
+			L.polyline([wp["BP801"], wp["BP802"], wp["BP803"]], sid31Style).addTo(sid31Group);
+			drawProcedure([{ at: "BP801", overfly: { inbound: 310, turn: "R", radius: 3.5 } },"BP811", "BP812"], sid31Style, sid31Group);
+			L.polyline([wp["BP803"], wp["BP812"], wp["VETIK"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP803"], wp["WITRI"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP812"], wp["WITRI"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP803"], wp["BP813"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP803"], wp["BADOV"]], sid31Style).addTo(sid31Group);
+			drawProcedure([{ at: "BP821", overfly: { inbound: 200, turn: "R", radius: 2 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
+			L.polyline([wp["BP822"], wp["DUZLA"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP822"], wp["FAHAZ"]], sid31Style).addTo(sid31Group);
+			L.polyline([wp["BP822"], wp["GAZDA"]], sid31Style).addTo(sid31Group);
 
-        // SID 13L
-        L.polyline([rwy31R, wp["BP701"], wp["BP712"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP701"], wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
-        L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
+			// SID 13L
+			L.polyline([rwy31R, wp["BP701"]], sid13LStyle).addTo(sid13lGroup);
+			drawProcedure([{ at: "BP701", overfly: { inbound: 120, turn: "L", radius: 3.5 } },"BP702"], sid13LStyle, sid13lGroup);
+			drawProcedure([{ at: "BP701", overfly: { inbound: 120, turn: "R", radius: 2.5 } },"BP712"], sid13LStyle, sid13lGroup);
+			L.polyline([rwy31L, wp["BP711"]], sid13LStyle).addTo(sid13lGroup);
+			drawProcedure([{ at: "BP711", overfly: { inbound: 132, turn: "L", radius: 2.9 } },"BP702"], sid13LStyle, sid13lGroup);
+			drawProcedure([{ at: "BP711", overfly: { inbound: 132, turn: "R", radius: 2.4 } },"BP712"], sid13LStyle, sid13lGroup);
+			L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
 
-        // STAR 31L/31R
-        L.polyline([wp["ANEXA"], wp["BP840"], wp["BP841"], wp["BP842"], wp["BP843"], wp["BP844"], wp["ATICO"]], star31Style).addTo(star31Group);
-        L.polyline([wp["ARFOX"], wp["BP870"], wp["BP871"], wp["BP872"], wp["ULPAX"], wp["BP874"], wp["NICRA"]], star31Style).addTo(star31Group);
-        L.polyline([wp["VAJDI"], wp["JOZEP"], wp["BP834"], wp["BP844"]], star31Style).addTo(star31Group);
-        L.polyline([wp["ULZAK"], wp["JOZEP"]], star31Style).addTo(star31Group);
-        L.polyline([wp["EBAMO"], wp["BP837"], wp["BP836"], wp["BP835"], wp["BP834"]], star31Style).addTo(star31Group);
-        L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP885"], wp["BP884"], wp["BP883"], wp["ULPAX"]], star31Style).addTo(star31Group);
-        L.polyline([wp["EDEMU"], wp["LAHOR"], wp["LUCLA"], wp["BP883"]], star31Style).addTo(star31Group);
-        L.polyline([wp["BETED"], wp["LAHOR"]], star31Style).addTo(star31Group);
-        
-        // STAR 13L/13R
-        L.polyline([wp["EBAMO"], wp["BP741"], wp["BP742"], wp["BP743"], wp["BP744"], wp["ECMAN"]], star13Style).addTo(star13Group);
-        L.polyline([wp["ULZAK"], wp["JOZEP"], wp["BP723"], wp["BP733"], wp["BP743"]], star13Style).addTo(star13Group);
-        L.polyline([wp["ANEXA"], wp["BP736"], wp["BP735"], wp["BP734"], wp["BP733"]], star13Style).addTo(star13Group);
-        L.polyline([wp["VAJDI"], wp["JOZEP"]], star13Style).addTo(star13Group);
-        L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP772"], wp["ULPAX"], wp["BP774"], wp["CATUZ"]], star13Style).addTo(star13Group);
-        L.polyline([wp["BETED"], wp["LAHOR"], wp["LUCLA"], wp["BP783"], wp["ULPAX"]], star13Style).addTo(star13Group);
-        L.polyline([wp["EDEMU"], wp["LAHOR"]], star13Style).addTo(star13Group);
-        L.polyline([wp["ARFOX"], wp["BP786"], wp["BP785"], wp["BP784"], wp["BP783"]], star13Style).addTo(star13Group);
+			// STAR 31L/31R
+			L.polyline([wp["ANEXA"], wp["BP840"], wp["BP841"], wp["BP842"], wp["BP843"], wp["BP844"], wp["ATICO"], wp["BP855"]], star31Style).addTo(star31Group);
+			L.polyline([wp["ARFOX"], wp["BP870"], wp["BP871"], wp["BP872"], wp["ULPAX"], wp["BP874"], wp["NICRA"], wp["BP865"]], star31Style).addTo(star31Group);
+			L.polyline([wp["ODVAS"], wp["BP328"], wp["BP331"], wp["BP329"], wp["BEREV"]], star31Style).addTo(star31Group);
+			L.polyline([wp["VAJDI"], wp["JOZEP"], wp["BP834"], wp["BP844"]], star31Style).addTo(star31Group);
+			L.polyline([wp["ULZAK"], wp["JOZEP"]], star31Style).addTo(star31Group);
+			L.polyline([wp["EBAMO"], wp["BP837"], wp["BP836"], wp["BP835"], wp["BP834"]], star31Style).addTo(star31Group);
+			L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP885"], wp["BP884"], wp["BP883"], wp["ULPAX"]], star31Style).addTo(star31Group);
+			L.polyline([wp["EDEMU"], wp["LAHOR"], wp["LUCLA"], wp["BP883"]], star31Style).addTo(star31Group);
+			L.polyline([wp["BETED"], wp["LAHOR"]], star31Style).addTo(star31Group);
+			
+			// STAR 13L/13R
+			L.polyline([wp["EBAMO"], wp["BP741"], wp["BP742"], wp["BP743"], wp["BP744"], wp["ECMAN"], wp["BP755"]], star13Style).addTo(star13Group);
+			L.polyline([wp["ULZAK"], wp["JOZEP"], wp["BP723"], wp["BP733"], wp["BP743"]], star13Style).addTo(star13Group);
+			L.polyline([wp["ANEXA"], wp["BP736"], wp["BP735"], wp["BP734"], wp["BP733"]], star13Style).addTo(star13Group);
+			L.polyline([wp["VAJDI"], wp["JOZEP"]], star13Style).addTo(star13Group);
+			L.polyline([wp["KEZAL"], wp["OCRIT"], wp["ZURFA"], wp["BP772"], wp["ULPAX"], wp["BP774"], wp["CATUZ"], wp["BP765"]], star13Style).addTo(star13Group);
+			L.polyline([wp["BETED"], wp["LAHOR"], wp["LUCLA"], wp["BP783"], wp["ULPAX"]], star13Style).addTo(star13Group);
+			L.polyline([wp["EDEMU"], wp["LAHOR"]], star13Style).addTo(star13Group);
+			L.polyline([wp["ARFOX"], wp["BP786"], wp["BP785"], wp["BP784"], wp["BP783"]], star13Style).addTo(star13Group);
 
             buildHoldingPattern("JOZEP", 100, true);
             buildHoldingPattern("HUZTA", 310, false);
@@ -1318,6 +1443,11 @@
                     if (state.telemetry.length > 4) state.telemetry.shift();
 
                     state.trackHistory.push([t.lat, t.lon]);
+                    // Cap the full flight-path trail so long-running sessions
+                    // (or an aircraft tracked for hours) don't grow this array
+                    // -- and the polyline rebuilt from it -- without bound.
+                    // ~1hr of history at the 2s sweep interval.
+                    if (state.trackHistory.length > 1800) state.trackHistory.shift();
 
                     if (!t.onGround) {
                         // The rendered aircraft marker lags real time by RENDER_DELAY_MS
@@ -1402,19 +1532,32 @@
             });
         }
 
+        // Leader lines should stay a constant length on screen regardless of
+        // zoom level. Convert a target on-screen pixel length into NM using
+        // the map's current meters-per-pixel resolution. This only actually
+        // changes when the map is zoomed or panned (latitude affects meters-
+        // per-pixel too), so it's recomputed on those events instead of
+        // every renderLoop animation frame (up to 60x/sec).
+        const LEADER_LINE_PX = 28;
+        let leaderLineNM = 0.3;
+        function updateLeaderLineNM() {
+            const metersPerPixel = 40075016.686 * Math.abs(Math.cos((map.getCenter().lat * Math.PI) / 180)) / Math.pow(2, map.getZoom() + 8);
+            leaderLineNM = (LEADER_LINE_PX * metersPerPixel) / 1852;
+        }
+        updateLeaderLineNM();
+        map.on('zoomend move', updateLeaderLineNM);
+
+        // Cached DOM references for renderLoop (runs up to 60x/sec via
+        // requestAnimationFrame) -- avoids repeated getElementById lookups
+        // on every single frame.
+        const callsignFormatCheckbox = document.getElementById('callsign-format-long');
+        const radarSearchInput = document.getElementById('radar-search');
+
         function renderLoop() {
             const renderTime = Date.now() - RENDER_DELAY_MS;
-            const useLongFormat = document.getElementById('callsign-format-long').checked;
+            const useLongFormat = callsignFormatCheckbox.checked;
 
-            const searchInput = document.getElementById('radar-search');
-            const searchQuery = searchInput ? searchInput.value.toUpperCase().trim() : "";
-
-            // Leader lines should stay a constant length on screen regardless of zoom level.
-            // Convert a target on-screen pixel length into NM using the map's current
-            // meters-per-pixel resolution at the current zoom.
-            const LEADER_LINE_PX = 28;
-            const metersPerPixel = 40075016.686 * Math.abs(Math.cos((map.getCenter().lat * Math.PI) / 180)) / Math.pow(2, map.getZoom() + 8);
-            const leaderLineNM = (LEADER_LINE_PX * metersPerPixel) / 1852;
+            const searchQuery = radarSearchInput ? radarSearchInput.value.toUpperCase().trim() : "";
 
             Object.keys(aircraftState).forEach(id => {
                 const state = aircraftState[id];
@@ -1628,8 +1771,8 @@
             'layer-airspace-aerobatics': airspaceAerobaticsGroup,
             'layer-airspace-other': airspaceOtherGroup,
             'layer-ground-features': groundFeaturesGroup,
-            'layer-sid31l': sid31lGroup,
-            'layer-sid13l': sid13lGroup,
+            'layer-sid31': sid31Group,
+            'layer-sid13': sid13lGroup,
             'layer-star31': star31Group,
             'layer-star13': star13Group
         };
@@ -1703,10 +1846,25 @@
             
             Object.keys(waypointMarkers).forEach(fixName => {
                 const marker = waypointMarkers[fixName];
+                const label = getWaypointLabel(fixName);
                 if (query && fixName.includes(query)) {
-                    marker.setTooltipContent(`<span style="color: #FFFF00; font-weight: bold;">${fixName}</span>`);
+                    marker.setTooltipContent(`<span style="color: #FFFF00; font-weight: bold;">${label}</span>`);
                 } else {
-                    marker.setTooltipContent(fixName);
+                    marker.setTooltipContent(label);
+                }
+            });
+        });
+
+        // Refresh all waypoint labels when the BP-prefix-stripping preference changes
+        document.getElementById('strip-bp-prefix').addEventListener('change', function() {
+            const query = document.getElementById('radar-search').value.toUpperCase().trim();
+            Object.keys(waypointMarkers).forEach(fixName => {
+                const marker = waypointMarkers[fixName];
+                const label = getWaypointLabel(fixName);
+                if (query && fixName.includes(query)) {
+                    marker.setTooltipContent(`<span style="color: #FFFF00; font-weight: bold;">${label}</span>`);
+                } else {
+                    marker.setTooltipContent(label);
                 }
             });
         });
