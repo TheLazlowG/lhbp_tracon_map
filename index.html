@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; }
         #radar-scope { width: 100vw; height: 100vh; background: #080808; }
@@ -17,7 +17,7 @@
             background: rgba(8, 8, 8, 0.4);
             padding: 1px 4px;
             z-index: 1000;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             color: #8A8A8A;
             font-size: 16px;
             font-weight: normal;
@@ -34,7 +34,7 @@
             background: rgba(8, 8, 8, 0.4);
             padding: 1px 4px;
             z-index: 1000;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             color: #8A8A8A;
             font-size: 12px;
             font-weight: normal;
@@ -69,7 +69,7 @@
             border: 1px solid #8A8A8A;
             border-right: none;
             color: #5DEB3D;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 12px;
             font-weight: bold;
             width: 28px;
@@ -100,7 +100,7 @@
             border: 1px solid rgba(255, 255, 255, 0.4);
             color: #8A8A8A;
             padding: 6px;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 11px;
             font-weight: bold;
             letter-spacing: 0.5px;
@@ -125,11 +125,11 @@
             background: rgba(8, 8, 8, 0.9);
             border: 1px solid #8A8A8A;
             padding: 12px 16px;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             color: #8A8A8A;
             border-radius: 0 0 0 2px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            max-height: 100vh;
+            max-height: 95vh;
             overflow-y: auto;
             width: 180px;
             box-sizing: content-box;
@@ -154,7 +154,7 @@
             border: 1px solid rgba(255, 255, 255, 0.4);
             color: #ffffff;
             padding: 6px;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 11px;
             box-sizing: border-box;
             border-radius: 2px;
@@ -175,7 +175,7 @@
         .taxiway-label {
             color: rgba(255, 255, 255, 0.65);
             font-size: 12px;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-weight: normal;
             letter-spacing: 0.5px;
             white-space: nowrap;
@@ -200,7 +200,7 @@
         .stand-marker .stand-label {
             margin-top: 1px;
             font-size: 10px;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-weight: normal;
             color: rgba(255, 200, 60, 0.9);
             white-space: nowrap;
@@ -210,7 +210,7 @@
             background: rgba(10, 14, 18, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.25);
             color: #E0F7FF;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 12px;
             line-height: 1.4;
             padding: 4px 7px;
@@ -266,7 +266,7 @@
             border: 1px solid rgba(255, 255, 255, 0.25);
             color: #8A8A8A;
             padding: 6px 8px;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 10.5px;
             font-weight: bold;
             letter-spacing: 0.5px;
@@ -297,7 +297,7 @@
         /* Waypoint Alphanumeric Text Styling */
         .fix-label {
             color: #8A8A8A;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 11px;
             font-weight: normal;
             text-shadow: none;
@@ -308,7 +308,7 @@
         /* ATC Target Label (Datablock) */
         .atc-label {
             color: #5DEB3D;
-            font-family: 'Noto Sans Mono', monospace;
+            font-family: 'Google Sans Code', monospace;
             font-size: 12px;
             font-weight: normal;
             text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
@@ -1254,7 +1254,7 @@
 			L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["BP813"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["BADOV"]], sid31Style).addTo(sid31Group);
-			drawProcedure([{ at: "BP821", overfly: { inbound: 200, turn: "R", radius: 2 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
+			drawProcedure([{ at: "BP821", overfly: { inbound: 200, turn: "R", radius: 3 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
 			L.polyline([wp["BP822"], wp["DUZLA"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP822"], wp["FAHAZ"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP822"], wp["GAZDA"]], sid31Style).addTo(sid31Group);
@@ -1824,8 +1824,8 @@
                     if (!state.onGround && state.telemetry.length > 1) {
                         const oldest = state.telemetry[0];
                         const diff = interpAlt - oldest.alt;
-                        if (diff > 50) trend = "▲";
-                        else if (diff < -50) trend = "▼";
+                        if (diff > 50) trend = " ↑";
+                        else if (diff < -50) trend = " ↓";
                     }
 
                     const isAircraftMatched = searchQuery && (
