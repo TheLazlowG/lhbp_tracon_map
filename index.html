@@ -348,6 +348,13 @@
         .atc-target-icon.selected {
             box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
         }
+        /* MLAT-sourced aircraft are shown as a rectangle instead of a
+           circle, so the position source is distinguishable at a glance. */
+        .atc-target-icon.mlat {
+            width: 6px;
+            height: 6px;
+            border-radius: 1px;
+        }
     </style>
 </head>
 <body>
@@ -358,8 +365,12 @@
         <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
         <div class="radar-ui-panel">
             <div class="radar-view-btn-row">
-                <button type="button" id="reset-view-btn" class="radar-reset-btn">TMA View</button>
-                <button type="button" id="arpt-view-btn" class="radar-reset-btn">ARPT View</button>
+                <button type="button" id="app-view-btn" class="radar-reset-btn">APP View</button>
+                <button type="button" id="twr-view-btn" class="radar-reset-btn">TWR View</button>
+                <button type="button" id="gnd-view-btn" class="radar-reset-btn">GND View</button>
+            </div>
+            <div class="radar-view-btn-row">
+                <button type="button" id="rwy-direction-btn" class="radar-reset-btn">RWY DIR: 13</button>
             </div>
 
             <div class="radar-ui-title">Radar Search</div>
@@ -406,16 +417,22 @@
                 <input type="checkbox" id="map-labels"> MAP LABELS
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-waypoints"> WAYPOINTS (FIX)
+                <input type="checkbox" id="layer-waypoints" checked> WAYPOINTS (FIX)
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="strip-bp-prefix"> STRIP "BP" PREFIX
+                <input type="checkbox" id="strip-bp-prefix" checked> STRIP "BP" PREFIX
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="filter-waypoints-7xx"> FILTER 7XX WAYPOINTS
+            </label>
+            <label class="radar-ui-control">
+                <input type="checkbox" id="filter-waypoints-8xx" checked> FILTER 8XX WAYPOINTS
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-extensions-13" checked> RWY 13 EXTENSION
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-extensions-31" checked> RWY 31 EXTENSION
+                <input type="checkbox" id="layer-extensions-31"> RWY 31 EXTENSION
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
@@ -490,15 +507,15 @@
                 <input type="checkbox" id="layer-sid31"> SID 31
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid13"> SID 13
+                <input type="checkbox" id="layer-sid13" checked> SID 13
             </label>
 
             <div class="radar-ui-section">Arrivals</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-star31" checked> STAR 31
+                <input type="checkbox" id="layer-star31"> STAR 31
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-star13"> STAR 13
+                <input type="checkbox" id="layer-star13" checked> STAR 13
             </label>
 
             <div class="radar-ui-title" style="margin-top: 14px;">LHBP ATC Radio</div>
@@ -537,11 +554,63 @@
         // ==========================================
         // View Preset Buttons
         // ==========================================
-        document.getElementById('reset-view-btn').addEventListener('click', function() {
-            map.setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
+        // Sets a checkbox's checked state AND fires a real 'change' event,
+        // so every listener already wired to that checkbox (toggles map,
+        // updateZoomGatedLayers, updateWaypointFilters, applyFiltering,
+        // etc.) reacts exactly as if the user had clicked it -- setting
+        // .checked alone does not dispatch 'change' in the DOM.
+        function setCheckbox(id, checked) {
+            const el = document.getElementById(id);
+            if (!el || el.checked === checked) return;
+            el.checked = checked;
+            el.dispatchEvent(new Event('change'));
+        }
+
+        document.getElementById('app-view-btn').addEventListener('click', function() {
+            map.setView(INITIAL_VIEW_CENTER, APP_VIEW_ZOOM);
+            setCheckbox('layer-ground-features', false);
+            setCheckbox('layer-stands', false);
         });
-        document.getElementById('arpt-view-btn').addEventListener('click', function() {
-            map.setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM + 5);
+        document.getElementById('twr-view-btn').addEventListener('click', function() {
+            map.setView(INITIAL_VIEW_CENTER, TWR_VIEW_ZOOM);
+            setCheckbox('layer-ground-features', true);
+            setCheckbox('layer-stands', true);
+        });
+        document.getElementById('gnd-view-btn').addEventListener('click', function() {
+            map.setView(INITIAL_VIEW_CENTER, GND_VIEW_ZOOM);
+            setCheckbox('layer-ground-features', true);
+            setCheckbox('layer-stands', true);
+        });
+
+        // ==========================================
+        // Runway Direction Swap (13 / 31): toggles every direction-tagged
+        // layer (RWY extensions, SID, STAR) to the selected direction, and
+        // switches the 7XX/8XX waypoint filter to match (13 in use hides
+        // the 31-direction BP8xx procedure points, and vice versa).
+        // ==========================================
+        let currentRwyDirection = "13";
+        const rwyDirectionBtn = document.getElementById('rwy-direction-btn');
+
+        function applyRwyDirection(direction) {
+            currentRwyDirection = direction;
+            rwyDirectionBtn.textContent = `RWY DIR: ${direction}`;
+
+            const is13 = direction === "13";
+            setCheckbox('layer-extensions-13', is13);
+            setCheckbox('layer-extensions-31', !is13);
+            setCheckbox('layer-sid13', is13);
+            setCheckbox('layer-sid31', !is13);
+            setCheckbox('layer-star13', is13);
+            setCheckbox('layer-star31', !is13);
+
+            // 13 in use -> hide the 31-direction (BP8xx) procedure points.
+            // 31 in use -> hide the 13-direction (BP7xx) procedure points.
+            setCheckbox('filter-waypoints-8xx', is13);
+            setCheckbox('filter-waypoints-7xx', !is13);
+        }
+
+        rwyDirectionBtn.addEventListener('click', function() {
+            applyRwyDirection(currentRwyDirection === "13" ? "31" : "13");
         });
 
         // ==========================================
@@ -690,7 +759,12 @@
 
         // 1. Initialize map centered on Budapest Airport (LHBP)
         const INITIAL_VIEW_CENTER = [47.4369, 19.2556];
-        const INITIAL_VIEW_ZOOM = 9.5;
+        // View presets, by zoom level: APP (approach/TMA-scale overview) <
+        // TWR (tower/airport-scale) < GND (ground/apron-scale, closest zoom).
+        const APP_VIEW_ZOOM = 9.5;
+        const TWR_VIEW_ZOOM = 12.5;
+        const GND_VIEW_ZOOM = 14.5;
+        const INITIAL_VIEW_ZOOM = APP_VIEW_ZOOM;
         const map = L.map('radar-scope', {
             zoomControl: false,
             attributionControl: false,
@@ -1282,6 +1356,15 @@
         const SWEEP_INTERVAL_MS = 2000;
         const RENDER_DELAY_MS = 2000;
         const HISTORY_LENGTH = 30;
+        // Set to 2 to only display every OTHER history dot (skips every 2nd
+        // one), 3 for every 3rd, etc. 1 shows all of them. This only thins
+        // out which dots are drawn -- the underlying position history and
+        // HISTORY_LENGTH trail length are unaffected.
+        const HISTORY_DOT_DISPLAY_SKIP = 2;
+        // History dots fade from HISTORY_DOT_MAX_OPACITY (newest) down to
+        // HISTORY_DOT_MIN_OPACITY (oldest) across the visible trail.
+        const HISTORY_DOT_MAX_OPACITY = 1;
+        const HISTORY_DOT_MIN_OPACITY = 0.15;
         let PREDICT_MINUTES = 0.25;
         const RADAR_CENTER = [47.4369, 19.2556];
         const RADAR_RADIUS_NM = 150;
@@ -1427,6 +1510,30 @@
             deselectAllAircraft();
         });
 
+        // Recomputes fillOpacity for every history dot of an aircraft, fading
+        // from HISTORY_DOT_MAX_OPACITY (newest visible dot) down to
+        // HISTORY_DOT_MIN_OPACITY (oldest dot still in the trail). Dots that
+        // are skipped by HISTORY_DOT_DISPLAY_SKIP (not currently on the map)
+        // still get their opacity updated so they're correct if re-shown.
+        function updateHistoryDotFade(state) {
+            const dots = state.historyDots;
+            // Index 0 is oldest, length-1 is the always-hidden "latest" dot,
+            // so the oldest VISIBLE dot is index 0 and the newest visible is
+            // length-2 (see the reveal logic above).
+            const visibleCount = dots.length - 1;
+            if (visibleCount <= 0) return;
+
+            for (let i = 0; i < dots.length; i++) {
+                // ageRank: 0 = newest visible dot, increasing with age.
+                const ageRank = (dots.length - 1) - i - 1;
+                if (ageRank < 0) continue; // the hidden "latest" dot itself
+
+                const t = visibleCount > 1 ? ageRank / (visibleCount - 1) : 0;
+                const opacity = HISTORY_DOT_MAX_OPACITY - t * (HISTORY_DOT_MAX_OPACITY - HISTORY_DOT_MIN_OPACITY);
+                dots[i].setStyle({ fillOpacity: opacity });
+            }
+        }
+
         function initAircraftState(id, callsign, srcType) {
             aircraftState[id] = {
                 id: id,
@@ -1437,6 +1544,7 @@
                 srcType: srcType || "OTHER",
                 telemetry: [],
                 historyDots: [],
+                historyDotRevealCount: 0,
                 trackHistory: [],
                 featureGroup: L.featureGroup().addTo(trafficGroup),
                 ui: {
@@ -1455,6 +1563,8 @@
             ui.leaderLine.addTo(aircraftState[id].featureGroup);
             ui.dataBlock.addTo(aircraftState[id].featureGroup);
 
+            updateMarkerSourceShape(id);
+
             ui.hitArea.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 selectAircraft(id);
@@ -1463,6 +1573,20 @@
                 L.DomEvent.stopPropagation(e);
                 selectAircraft(id);
             });
+        }
+
+        // Toggles the "mlat" CSS class on an aircraft's marker element so
+        // MLAT-sourced positions render as a rectangle instead of a circle.
+        function updateMarkerSourceShape(id) {
+            const state = aircraftState[id];
+            if (!state) return;
+            const icon = state.ui.marker.getElement();
+            if (!icon) return;
+            if (state.srcType === 'MLAT') {
+                icon.classList.add('mlat');
+            } else {
+                icon.classList.remove('mlat');
+            }
         }
 
         function processTrafficTargets(targets, sourceLabel, siteDomain) {
@@ -1480,6 +1604,7 @@
                 state.latestAlt = t.alt;
                 state.onGround = !!t.onGround;
                 state.srcType = t.srcType || "OTHER";
+                updateMarkerSourceShape(t.id);
 
                 const lastData = state.telemetry[state.telemetry.length - 1];
                 if (!lastData || lastData.lat !== t.lat || lastData.lon !== t.lon) {
@@ -1501,14 +1626,21 @@
                         // So we keep the newest dot hidden and only show dots from
                         // "latest+1" back to "latest+31" (i.e. skip index 0 from the
                         // end, display the next 30).
-                        const dot = L.circleMarker([t.lat, t.lon], { radius: 1.5, color: '#5DEB3D', fillOpacity: 0.5, weight: 0, interactive: false, pane: 'aircraftPane' });
+                        const dot = L.circleMarker([t.lat, t.lon], { radius: 2, color: '#5DEB3D', fillOpacity: 1, weight: 0, interactive: false, pane: 'aircraftPane' });
                         state.historyDots.push(dot);
 
                         // Reveal the previous newest dot now that a newer one has
                         // taken its place as "latest" (it becomes "latest+1").
+                        // Only actually add it to the map if it lands on the
+                        // configured display-skip interval, so e.g. every OTHER
+                        // dot can be shown while the underlying trail data (and
+                        // the "latest+1..latest+31" windowing above) is unaffected.
                         if (state.historyDots.length >= 2) {
-                            const toReveal = state.historyDots[state.historyDots.length - 2];
-                            if (!state.featureGroup.hasLayer(toReveal)) {
+                            const revealIndex = state.historyDots.length - 2;
+                            const toReveal = state.historyDots[revealIndex];
+                            state.historyDotRevealCount++;
+                            const shouldShow = (state.historyDotRevealCount % HISTORY_DOT_DISPLAY_SKIP) === 0;
+                            if (shouldShow && !state.featureGroup.hasLayer(toReveal)) {
                                 toReveal.addTo(state.featureGroup);
                             }
                         }
@@ -1517,6 +1649,8 @@
                             const oldDot = state.historyDots.shift();
                             state.featureGroup.removeLayer(oldDot);
                         }
+
+                        updateHistoryDotFade(state);
                     }
                 }
             });
@@ -1567,6 +1701,13 @@
                 if (trafficLayerActive && fl <= limitFL && matchesHardwareFilter && matchesGroundFilter) {
                     if (!trafficGroup.hasLayer(state.featureGroup)) {
                         trafficGroup.addLayer(state.featureGroup);
+                        // Leaflet creates a fresh DOM element for the marker
+                        // whenever it's re-added to the map, which loses the
+                        // "mlat" class that was previously applied
+                        // imperatively -- reapply it now so the correct
+                        // shape shows immediately instead of flashing as a
+                        // circle first.
+                        updateMarkerSourceShape(id);
                     }
                 } else {
                     if (trafficGroup.hasLayer(state.featureGroup)) {
@@ -1848,11 +1989,11 @@
         // Zoom-Gated Layers: taxiway labels and stand
         // markers only render once zoomed in enough to
         // be legible, in addition to their own checkbox.
-        //   - Taxiway labels: visible from (ARPT view zoom - 1) and up
-        //   - Stands: visible from ARPT view zoom and up
+        //   - Taxiway labels: visible from (GND view zoom - 1) and up
+        //   - Stands: visible from GND view zoom and up
         // ==========================================
-        const TAXIWAY_LABEL_MIN_ZOOM = (INITIAL_VIEW_ZOOM + 5) - 1;
-        const STANDS_MIN_ZOOM = INITIAL_VIEW_ZOOM + 5;
+        const TAXIWAY_LABEL_MIN_ZOOM = GND_VIEW_ZOOM - 1;
+        const STANDS_MIN_ZOOM = GND_VIEW_ZOOM;
 
         function updateZoomGatedLayers() {
             const currentZoom = map.getZoom();
@@ -1879,6 +2020,33 @@
         document.getElementById('layer-stands').addEventListener('change', updateZoomGatedLayers);
         // Initial sync in case the map loads already zoomed past a threshold
         updateZoomGatedLayers();
+
+        // ==========================================
+        // Waypoint 7XX/8XX Filters: hide BP7xx or BP8xx
+        // procedure points (e.g. to declutter the display
+        // to whichever runway direction is currently in use).
+        // ==========================================
+        function updateWaypointFilters() {
+            const hide7xx = document.getElementById('filter-waypoints-7xx').checked;
+            const hide8xx = document.getElementById('filter-waypoints-8xx').checked;
+
+            Object.keys(waypointMarkers).forEach(fixName => {
+                const marker = waypointMarkers[fixName];
+                const is7xx = /^BP7\d\d/.test(fixName);
+                const is8xx = /^BP8\d\d/.test(fixName);
+
+                const shouldHide = (is7xx && hide7xx) || (is8xx && hide8xx);
+
+                if (shouldHide) {
+                    if (waypointsGroup.hasLayer(marker)) waypointsGroup.removeLayer(marker);
+                } else {
+                    if (!waypointsGroup.hasLayer(marker)) marker.addTo(waypointsGroup);
+                }
+            });
+        }
+
+        document.getElementById('filter-waypoints-7xx').addEventListener('change', updateWaypointFilters);
+        document.getElementById('filter-waypoints-8xx').addEventListener('change', updateWaypointFilters);
 
         // Telephony Format Toggle Event Listener
         document.getElementById('callsign-format-long').addEventListener('change', function(e) {
@@ -2179,6 +2347,10 @@
             await loadTaxiwayLines();
             await loadStands();
             await loadAirspaces();
+            // Initialize the runway-direction-dependent layers (extensions,
+            // SID, STAR, 7XX/8XX waypoint filters) to the default direction
+            // (13) now that every checkbox's change listener is registered.
+            applyRwyDirection(currentRwyDirection);
             fetchRadarSweep();
             if (sweepWorker) {
                 sweepWorker.postMessage({ type: 'start', intervalMs: SWEEP_INTERVAL_MS });
