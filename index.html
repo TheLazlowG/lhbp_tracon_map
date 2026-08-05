@@ -370,7 +370,7 @@
                 <button type="button" id="gnd-view-btn" class="radar-reset-btn">GND View</button>
             </div>
             <div class="radar-view-btn-row">
-                <button type="button" id="rwy-direction-btn" class="radar-reset-btn">RWY DIR: 13</button>
+                <button type="button" id="rwy-direction-btn" class="radar-reset-btn">RWY DIR: 31</button>
             </div>
 
             <div class="radar-ui-title">Radar Search</div>
@@ -423,16 +423,16 @@
                 <input type="checkbox" id="strip-bp-prefix" checked> STRIP "BP" PREFIX
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="filter-waypoints-7xx"> FILTER 7XX WAYPOINTS
+                <input type="checkbox" id="filter-waypoints-7xx" checked> FILTER 7XX WAYPOINTS
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="filter-waypoints-8xx" checked> FILTER 8XX WAYPOINTS
+                <input type="checkbox" id="filter-waypoints-8xx"> FILTER 8XX WAYPOINTS
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-extensions-13" checked> RWY 13 EXTENSION
+                <input type="checkbox" id="layer-extensions-13"> RWY 13 EXTENSION
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-extensions-31"> RWY 31 EXTENSION
+                <input type="checkbox" id="layer-extensions-31" checked> RWY 31 EXTENSION
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
@@ -504,18 +504,18 @@
 
             <div class="radar-ui-section">Departures</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid31"> SID 31
+                <input type="checkbox" id="layer-sid31" checked> SID 31
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid13" checked> SID 13
+                <input type="checkbox" id="layer-sid13"> SID 13
             </label>
 
             <div class="radar-ui-section">Arrivals</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-star31"> STAR 31
+                <input type="checkbox" id="layer-star31" checked> STAR 31
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-star13" checked> STAR 13
+                <input type="checkbox" id="layer-star13"> STAR 13
             </label>
 
             <div class="radar-ui-title" style="margin-top: 14px;">LHBP ATC Radio</div>
@@ -570,16 +570,19 @@
             map.setView(INITIAL_VIEW_CENTER, APP_VIEW_ZOOM);
             setCheckbox('layer-ground-features', false);
             setCheckbox('layer-stands', false);
+			setCheckbox('show-ground-traffic', false);
         });
         document.getElementById('twr-view-btn').addEventListener('click', function() {
             map.setView(INITIAL_VIEW_CENTER, TWR_VIEW_ZOOM);
             setCheckbox('layer-ground-features', true);
             setCheckbox('layer-stands', true);
+			setCheckbox('show-ground-traffic', true);
         });
         document.getElementById('gnd-view-btn').addEventListener('click', function() {
             map.setView(INITIAL_VIEW_CENTER, GND_VIEW_ZOOM);
             setCheckbox('layer-ground-features', true);
             setCheckbox('layer-stands', true);
+			setCheckbox('show-ground-traffic', true);
         });
 
         // ==========================================
@@ -588,7 +591,7 @@
         // switches the 7XX/8XX waypoint filter to match (13 in use hides
         // the 31-direction BP8xx procedure points, and vice versa).
         // ==========================================
-        let currentRwyDirection = "13";
+        let currentRwyDirection = "31";
         const rwyDirectionBtn = document.getElementById('rwy-direction-btn');
 
         function applyRwyDirection(direction) {
