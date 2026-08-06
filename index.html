@@ -5,7 +5,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; }
+		<!-- :root { -->
+			<!-- --accent-color: #5DE_B3D; #5DEB3D is the current-->
+			<!-- --accent-rgb: 93, 235, 61; -->
+		<!-- } -->
+		body { margin: 0; background-color: #000; overflow: hidden; }
         #radar-scope { width: 100vw; height: 100vh; background: #080808; }
         
         /* Dynamic Zulu Clock Header Indicator */
@@ -423,10 +427,10 @@
                 <input type="checkbox" id="strip-bp-prefix" checked> STRIP "BP" PREFIX
             </label>
 			<label class="radar-ui-control">
-                <input type="checkbox" id="filter-waypoints-8xx"> FILTER 8XX WAYPOINTS
+                <input type="checkbox" id="filter-waypoints-8xx"> FILTER RWY 31 WAYPOINTS
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="filter-waypoints-7xx" checked> FILTER 7XX WAYPOINTS
+                <input type="checkbox" id="filter-waypoints-7xx" checked> FILTER RWY 13 WAYPOINTS
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-extensions-13"> RWY 13 EXTENSION
@@ -1079,6 +1083,23 @@
         let waypoints = {};
         let wp = {};
 
+        // Waypoint filter definitions
+        const RWY31_FILTER = [
+            /^BP8\d\d$/,
+            "BP328","BP329","BP331"
+        ];
+
+        const RWY13_FILTER = [
+            /^BP7\d\d$/
+        ];
+
+        function matchesWaypointFilter(name, rules) {
+            return rules.some(rule =>
+                rule instanceof RegExp ? rule.test(name) : rule === name
+            );
+        }
+
+
         // Returns the display label for a waypoint, optionally stripping a
         // leading "BP" prefix (internal procedure-point naming convention)
         // when the "STRIP BP PREFIX" checkbox is checked.
@@ -1162,110 +1183,130 @@
                 return null;
             }
 
-            function drawProcedure(points, style, group) {
-                const line = [];
+			function drawProcedure(points, style, group) {
+				const line = [];
 
-                for (let i = 0; i < points.length; i++) {
-                    const entry = points[i];
-                    const fixPos = resolvePoint(entry);
-                    if (!fixPos) continue;
+				// Helper to normalize angle differences into [-180, 180] degrees
+				const normalizeAngle = (deg) => {
+					let a = deg % 360;
+					if (a > 180) a -= 360;
+					if (a < -180) a += 360;
+					return a;
+				};
 
-                    const isOverfly = entry && typeof entry === 'object' && !Array.isArray(entry) && entry.overfly;
+				for (let i = 0; i < points.length; i++) {
+					const entry = points[i];
+					const fixPos = resolvePoint(entry);
+					if (!fixPos) continue;
 
-                    if (!isOverfly || i === points.length - 1) {
-                        // Normal fly-by vertex (or an overfly point with nothing
-                        // after it, which can't curve) -- just add it as-is.
-                        line.push(fixPos);
-                        continue;
-                    }
+					const isOverfly = entry && typeof entry === 'object' && !Array.isArray(entry) && entry.overfly;
 
-                    const nextPos = resolvePoint(points[i + 1]);
-                    if (!nextPos) {
-                        line.push(fixPos);
-                        continue;
-                    }
+					if (!isOverfly || i === points.length - 1) {
+						line.push(fixPos);
+						continue;
+					}
 
-                    const { inbound, turn, radius } = entry.overfly;
-                    const turnSign = turn === 'R' ? 1 : -1;
+					const nextPos = resolvePoint(points[i + 1]);
+					if (!nextPos) {
+						line.push(fixPos);
+						continue;
+					}
 
-                    // Turn center: offset from the fix, perpendicular to the
-                    // inbound course, toward the turn direction.
-                    const centerBearing = (inbound + turnSign * 90 + 360) % 360;
-                    const center = getOffsetPoint(fixPos, radius, centerBearing);
+					const { inbound, nextInbound, turn } = entry.overfly;
 
-                    const d = planarDistanceNM(center, nextPos);
+					if (nextInbound === undefined) {
+						line.push(fixPos);
+						continue;
+					}
 
-                    if (d <= radius) {
-                        // Degenerate case (next fix is inside the turn circle) --
-                        // fall back to a straight line, nothing sane to draw.
-                        line.push(fixPos);
-                        continue;
-                    }
+					// 1. Calculate turn difference with 360/0 wrap handling
+					const rawDiff = normalizeAngle(nextInbound - inbound);
 
-                    // Tangent line from `center` to `nextPos`: the roll-out point
-                    // is where a line from nextPos, tangent to the turn circle,
-                    // touches the circle -- solved via the standard external
-                    // tangent construction (right triangle: hypotenuse d,
-                    // opposite side radius, so the half-angle at nextPos is
-                    // asin(radius/d)).
-                    const bearingCenterToNext = getBearing(center, nextPos);
-                    const halfAngle = (Math.asin(radius / d) * 180) / Math.PI;
-                    // The tangent point sits `(90 - halfAngle)` degrees around
-                    // the circle from the center->next bearing, on the side
-                    // consistent with the turn direction.
-                    const tangentPointBearing = (bearingCenterToNext - turnSign * (90 - halfAngle) + 360) % 360;
-                    const rollOutPoint = getOffsetPoint(center, radius, tangentPointBearing);
+					// Determine Turn Direction (+1 = Right / Clockwise, -1 = Left / Counter-Clockwise)
+					let turnSign = 1;
+					if (turn) {
+						turnSign = turn === 'R' ? 1 : -1;
+					} else {
+						turnSign = rawDiff >= 0 ? 1 : -1;
+					}
 
-                    // Sweep the arc from the fix (which sits on the circle at
-                    // the inbound-tangent point) to the roll-out point, in the
-                    // turn direction, picking the shorter way round.
-                    const startAngle = (centerBearing + 180) % 360; // bearing from center to fix
-                    let endAngle = tangentPointBearing;
-                    let sweep = turnSign * (endAngle - startAngle);
-                    sweep = ((sweep % 360) + 360) % 360;
-                    // If the naive sweep is the "long way" (>180), the true turn
-                    // is the short way in the opposite rotational sense for this
-                    // segment only -- but by construction (turnSign fixed) this
-                    // shouldn't happen for realistic geometry, so no correction
-                    // needed here.
+					// Calculate absolute turn change (0° to 180°)
+					let turnAngleDeg;
+					if (turn) {
+						turnAngleDeg = turnSign === 1 ? (rawDiff + 360) % 360 : (-rawDiff + 360) % 360;
+					} else {
+						turnAngleDeg = Math.abs(rawDiff);
+					}
 
-                    const ARC_STEPS = 16;
-                    for (let s = 0; s <= ARC_STEPS; s++) {
-                        const a = (startAngle + turnSign * (sweep * s / ARC_STEPS) + 720) % 360;
-                        line.push(getOffsetPoint(center, radius, a));
-                    }
-                    line.push(rollOutPoint);
-                    // Straight leg from roll-out point to the next fix is
-                    // implicit: the next loop iteration adds nextPos itself.
-                }
+					// Straight leg or invalid turn check
+					if (turnAngleDeg <= 0.1 || turnAngleDeg >= 179.9) {
+						line.push(fixPos);
+						continue;
+					}
 
-                L.polyline(line, style).addTo(group);
-            }
+					const delta = (turnAngleDeg * Math.PI) / 180;
+
+					// 2. Compute Perpendicular Distance from A to line through B along nextInbound
+					const line2NormalBearing = (nextInbound - turnSign * 90 + 360) % 360;
+					
+					const distAB = planarDistanceNM(fixPos, nextPos);
+					const bearingAB = getBearing(fixPos, nextPos);
+					
+					// Angle between vector AB and line2NormalBearing
+					const alpha = ((bearingAB - line2NormalBearing) * Math.PI) / 180;
+					
+					const d_perp = distAB * Math.cos(alpha);
+
+					// 3. Radius Solution
+					let radius = d_perp / (1 - Math.cos(delta));
+
+					if (isNaN(radius) || radius <= 0.01) {
+						line.push(fixPos);
+						continue;
+					}
+
+					// 4. Circle Center & Start Bearing
+					const centerBearing = (inbound + turnSign * 90 + 360) % 360;
+					const center = getOffsetPoint(fixPos, radius, centerBearing);
+
+					const startBearing = (centerBearing + 180) % 360;
+
+					// 5. Arc Generation
+					const ARC_STEPS = 16;
+					for (let s = 0; s <= ARC_STEPS; s++) {
+						const stepAngle = turnSign * (turnAngleDeg * (s / ARC_STEPS));
+						const currentBearing = (startBearing + stepAngle + 720) % 360;
+						line.push(getOffsetPoint(center, radius, currentBearing));
+					}
+				}
+
+				L.polyline(line, style).addTo(group);
+			}
 
             // SID 31L
             L.polyline([rwy13R, wp["BP801"]], sid31Style).addTo(sid31Group);
             L.polyline([rwy13L, wp["BP801"]], sid31Style).addTo(sid31Group);
-			drawProcedure([{ at: "BP801", overfly: { inbound: 310, turn: "L", radius: 2.5 } },"BP821", "BP822"], sid31Style, sid31Group);
+			drawProcedure([{ at: "BP801", overfly: { inbound: 320, nextInbound: 205	} },"BP821", "BP822"], sid31Style, sid31Group);
 			L.polyline([wp["BP801"], wp["BP802"], wp["BP803"]], sid31Style).addTo(sid31Group);
-			drawProcedure([{ at: "BP801", overfly: { inbound: 310, turn: "R", radius: 3.5 } },"BP811", "BP812"], sid31Style, sid31Group);
+			drawProcedure([{ at: "BP801", overfly: { inbound: 320, nextInbound: 043 } },"BP811", "BP812"], sid31Style, sid31Group);
 			L.polyline([wp["BP803"], wp["BP812"], wp["VETIK"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["WITRI"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP812"], wp["WITRI"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["BP813"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["BADOV"]], sid31Style).addTo(sid31Group);
-			drawProcedure([{ at: "BP821", overfly: { inbound: 200, turn: "R", radius: 3 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
+			drawProcedure([{ at: "BP821", overfly: { inbound: 205, nextInbound: 300 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
 			L.polyline([wp["BP822"], wp["DUZLA"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP822"], wp["FAHAZ"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP822"], wp["GAZDA"]], sid31Style).addTo(sid31Group);
 
 			// SID 13L
 			L.polyline([rwy31R, wp["BP701"]], sid13LStyle).addTo(sid13lGroup);
-			drawProcedure([{ at: "BP701", overfly: { inbound: 120, turn: "L", radius: 3.5 } },"BP702"], sid13LStyle, sid13lGroup);
-			drawProcedure([{ at: "BP701", overfly: { inbound: 120, turn: "R", radius: 2.5 } },"BP712"], sid13LStyle, sid13lGroup);
+			drawProcedure([{ at: "BP701", overfly: { inbound: 120, nextInbound: 047 } },"BP702"], sid13LStyle, sid13lGroup);
+			drawProcedure([{ at: "BP701", overfly: { inbound: 120, nextInbound: 242 } },"BP712"], sid13LStyle, sid13lGroup);
 			L.polyline([rwy31L, wp["BP711"]], sid13LStyle).addTo(sid13lGroup);
-			drawProcedure([{ at: "BP711", overfly: { inbound: 132, turn: "L", radius: 2.9 } },"BP702"], sid13LStyle, sid13lGroup);
-			drawProcedure([{ at: "BP711", overfly: { inbound: 132, turn: "R", radius: 2.4 } },"BP712"], sid13LStyle, sid13lGroup);
+			drawProcedure([{ at: "BP711", overfly: { inbound: 132, nextInbound: 047 } },"BP702"], sid13LStyle, sid13lGroup);
+			drawProcedure([{ at: "BP711", overfly: { inbound: 132, nextInbound: 242 } },"BP712"], sid13LStyle, sid13lGroup);
 			L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
 			L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
 			L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
@@ -1273,7 +1314,6 @@
 			L.polyline([wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
 			L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
 			L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
 			L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
 			L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
 
@@ -2029,24 +2069,29 @@
         // procedure points (e.g. to declutter the display
         // to whichever runway direction is currently in use).
         // ==========================================
-        function updateWaypointFilters() {
-            const hide7xx = document.getElementById('filter-waypoints-7xx').checked;
-            const hide8xx = document.getElementById('filter-waypoints-8xx').checked;
+		function updateWaypointFilters() {
+			const hide13 = document.getElementById('filter-waypoints-7xx').checked;
+			const hide31 = document.getElementById('filter-waypoints-8xx').checked;
 
-            Object.keys(waypointMarkers).forEach(fixName => {
-                const marker = waypointMarkers[fixName];
-                const is7xx = /^BP7\d\d/.test(fixName);
-                const is8xx = /^BP8\d\d/.test(fixName);
+			Object.keys(waypointMarkers).forEach(fixName => {
+				const marker = waypointMarkers[fixName];
 
-                const shouldHide = (is7xx && hide7xx) || (is8xx && hide8xx);
+				const is13 = matchesWaypointFilter(fixName, RWY13_FILTER);
+				const is31 = matchesWaypointFilter(fixName, RWY31_FILTER);
 
-                if (shouldHide) {
-                    if (waypointsGroup.hasLayer(marker)) waypointsGroup.removeLayer(marker);
-                } else {
-                    if (!waypointsGroup.hasLayer(marker)) marker.addTo(waypointsGroup);
-                }
-            });
-        }
+				const shouldHide =
+					(hide13 && is13) ||
+					(hide31 && is31);
+
+				if (shouldHide) {
+					if (waypointsGroup.hasLayer(marker))
+						waypointsGroup.removeLayer(marker);
+				} else {
+					if (!waypointsGroup.hasLayer(marker))
+						marker.addTo(waypointsGroup);
+				}
+			});
+		}
 
         document.getElementById('filter-waypoints-7xx').addEventListener('change', updateWaypointFilters);
         document.getElementById('filter-waypoints-8xx').addEventListener('change', updateWaypointFilters);
