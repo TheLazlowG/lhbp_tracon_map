@@ -309,6 +309,113 @@
             border: none;
         }
 
+        /* ---------- Label editor mode (dev-only, see EDITOR_MODE) ---------- */
+        .editable-label-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+        .editable-label-base {
+            display: inline-block;
+            position: relative;
+        }
+        .editable-label-text {
+            display: inline-block;
+            color: #8A8A8A;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 11px;
+            font-weight: normal;
+            white-space: nowrap;
+            cursor: grab;
+            /* Padding + border exactly mirror Leaflet's default
+               .leaflet-tooltip box (padding: 6px; border: 1px solid),
+               which the public map only strips the color/background/
+               shadow from -- not the box-model contribution. Since the
+               real tooltip's direction:'top' placement subtracts its
+               FULL rendered height (offsetHeight, padding+border
+               included) to find its top edge, matching that box model
+               here is what keeps the editor's default label position
+               lined up with the real tooltip's. Don't shrink this
+               padding/border without also expecting the default
+               position to drift. */
+            padding: 6px;
+            border-radius: 3px;
+            border: 1px solid transparent;
+            box-sizing: content-box;
+            user-select: none;
+        }
+        .editable-label-text:active { cursor: grabbing; }
+        .editable-label-text.is-selected {
+            color: #ffffff;
+            border-color: #FFFF00;
+            background: rgba(255, 255, 0, 0.10);
+        }
+        .editable-label-text.is-dirty:not(.is-selected) {
+            color: #FFFF00;
+        }
+        .editable-label-text.is-dragging {
+            color: #ffffff;
+            border-color: #5DEB3D;
+            background: rgba(93, 235, 61, 0.15);
+        }
+        .editor-select-box {
+            position: absolute;
+            border: 1px dashed #5DEB3D;
+            background: rgba(93, 235, 61, 0.08);
+            pointer-events: none;
+            z-index: 2000;
+        }
+        .editor-hud {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            background: rgba(8, 8, 8, 0.92);
+            border: 1px solid #8A8A8A;
+            border-radius: 3px;
+            padding: 8px 14px;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 11px;
+            color: #8A8A8A;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        .editor-hud .hud-title {
+            color: #FFFF00;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .editor-hud .hud-count .n { color: #5DEB3D; font-weight: bold; }
+        .editor-hud .hud-offset .n { color: #ffffff; font-weight: bold; }
+        .editor-hud .hud-hint { color: #555; }
+        .editor-hud .hud-btn {
+            background: #141414;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: #8A8A8A;
+            padding: 4px 10px;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 10px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .editor-hud .hud-btn:hover {
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+        .editor-hud .hud-btn:disabled {
+            opacity: 0.35;
+            cursor: default;
+            pointer-events: none;
+        }
+        .editor-hud .hud-btn.save-btn { color: #5DEB3D; border-color: rgba(93, 235, 61, 0.5); }
+        .editor-hud .hud-btn.save-btn:hover { border-color: #5DEB3D; }
+
         /* ATC Target Label (Datablock) */
         .atc-label {
             color: #5DEB3D;
@@ -540,6 +647,34 @@
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
+        // ---------------------------------------------------------------
+        // LABEL EDITOR MODE
+        //
+        // Flip this to true locally to edit waypoint label offsets
+        // directly on this map (drag labels, multiselect, arrow-key
+        // nudge, Ctrl/Cmd+S to export labelOffsets.json). Leave it false
+        // for the public-facing build -- there's no UI toggle for this on
+        // purpose, it's a developer switch only.
+        //
+        // When true:
+        //   - Waypoint labels render as draggable text markers instead of
+        //     static tooltips.
+        //   - Click to select a label, Shift/Ctrl/Cmd-click to add to the
+        //     selection, drag a rubber-band box on empty map to select
+        //     everything inside it.
+        //   - Arrow keys nudge every selected label by 1px (Shift+arrow
+        //     = 10px). Dragging any one selected label drags the whole
+        //     selection together, preserving relative positions.
+        //   - A small floating panel shows the dirty count and lets you
+        //     export the edited labelOffsets.json (only the fixes you
+        //     actually changed) or reset the current selection.
+        //
+        // Declared first, before anything else in this script, because
+        // the pane setup below (right after the map is created) needs to
+        // check it before the waypoint loop runs.
+        // ---------------------------------------------------------------
+        const EDITOR_MODE = false;
+
         // ==========================================
         // UI Collapsible Panel Controller
         // ==========================================
@@ -565,8 +700,13 @@
         // .checked alone does not dispatch 'change' in the DOM.
         function setCheckbox(id, checked) {
             const el = document.getElementById(id);
-            if (!el || el.checked === checked) return;
+            if (!el) return;
             el.checked = checked;
+            // Always dispatch, even if the value didn't change: this is also
+            // used to sync dependent state (layer visibility, waypoint
+            // filters, etc.) at boot, where the checkbox's HTML default may
+            // already match the target value but the actual filtering logic
+            // has never run yet.
             el.dispatchEvent(new Event('change'));
         }
 
@@ -810,6 +950,15 @@
         map.getPane('runwayLinesPane').style.zIndex = 390;
         map.createPane('aircraftPane');
         map.getPane('aircraftPane').style.zIndex = 700;
+
+        // Editor-mode label pane, created here (before any markers try to
+        // use it) rather than inside initLabelEditor(), since that isn't
+        // called until after every waypoint's editable label marker has
+        // already tried to add itself to this pane.
+        if (EDITOR_MODE) {
+            map.createPane('editorLabelsPane');
+            map.getPane('editorLabelsPane').style.zIndex = 5000;
+        }
         
         // Define CartoDB Basemap Variants (With Labels & No Labels)
         const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
@@ -1083,6 +1232,439 @@
         let waypoints = {};
         let wp = {};
 
+        // Per-fix label offset overrides, in CSS pixels [dx, dy] relative
+        // to the original tooltip's direction:'top' base anchor (centered
+        // above the marker, offset:[0,8] by default -- see
+        // getLabelOffset()). Loaded from data/labelOffsets.json if
+        // present; falls back to {} (every fix uses the default) if the
+        // file is missing, since not every deployment will have run the
+        // editor yet.
+        let labelOffsets = {};
+
+        // The true, hardcoded default offset -- what a fix uses when it
+        // has never been touched by the editor at all. This is the
+        // baseline "modified vs not" is measured against for export,
+        // independent of whatever labelOffsets.json happened to already
+        // contain when this session started.
+        const DEFAULT_LABEL_OFFSET = [0, 8];
+
+        function getLabelOffset(fixName) {
+            return labelOffsets[fixName] || DEFAULT_LABEL_OFFSET;
+        }
+
+        // ---------------------------------------------------------------
+        // Label editor internals (only wired up when EDITOR_MODE is true)
+        // ---------------------------------------------------------------
+        const editableLabels = {};   // fixName -> { marker, dx, dy, originalDx, originalDy }
+
+        // "Changed since page load" per fix -- purely for the yellow
+        // is-dirty highlight so you can see what you've touched *this
+        // session*. This is NOT what export uses: export always
+        // re-derives its list from DEFAULT_LABEL_OFFSET (see
+        // getAllModifiedFixNames()), so a fix that arrived already-
+        // modified from labelOffsets.json but wasn't touched this session
+        // still gets exported, even though it never appears in this set.
+        const editorDirty = new Set();
+        let editorSelection = new Set();
+        let editorPane = null;
+
+        function refreshEditableLabelText(fixName) {
+            const entry = editableLabels[fixName];
+            if (!entry) return;
+            const el = entry.marker.getElement();
+            const textEl = el && el.querySelector('.editable-label-text');
+            if (textEl) textEl.textContent = getWaypointLabel(fixName);
+        }
+
+        function makeEditableLabelIcon(fixName, dx, dy) {
+            const label = getWaypointLabel(fixName);
+            // -100% (bottom edge at marker point) reproduces _setPosition's
+            // subY = tooltipHeight math. The extra -6px reproduces
+            // leaflet.css's .leaflet-tooltip-top { margin-top: -6px },
+            // which is a separate CSS shift Leaflet applies on top of that
+            // for the direction:'top' arrow-pointer accommodation --
+            // without it the box sits 6px too low relative to the real
+            // tooltip. Confirmed against leaflet@1.9.4's actual source/CSS,
+            // not inferred.
+            return L.divIcon({
+                className: 'editable-label-icon',
+                html: `<div class="editable-label-base" style="transform: translate(-50%, calc(-100% - 6px));"><span class="editable-label-text" data-fix="${fixName}" style="transform: translate(${dx}px, ${dy}px);">${label}</span></div>`,
+                iconSize: [0, 0],
+                iconAnchor: [0, 0]
+            });
+        }
+
+        function updateEditableLabelTransform(fixName) {
+            const entry = editableLabels[fixName];
+            if (!entry) return;
+            const el = entry.marker.getElement();
+            const textEl = el && el.querySelector('.editable-label-text');
+            if (textEl) textEl.style.transform = `translate(${entry.dx}px, ${entry.dy}px)`;
+        }
+
+        function markEditableLabelDirty(fixName) {
+            const entry = editableLabels[fixName];
+            if (!entry) return;
+            const isDirty = entry.dx !== entry.originalDx || entry.dy !== entry.originalDy;
+            if (isDirty) editorDirty.add(fixName); else editorDirty.delete(fixName);
+            const el = entry.marker.getElement();
+            const textEl = el && el.querySelector('.editable-label-text');
+            if (textEl) textEl.classList.toggle('is-dirty', isDirty);
+        }
+
+        function setLabelSelected(fixName, selected) {
+            const entry = editableLabels[fixName];
+            if (!entry) return;
+            const el = entry.marker.getElement();
+            const textEl = el && el.querySelector('.editable-label-text');
+            if (textEl) textEl.classList.toggle('is-selected', selected);
+            if (selected) editorSelection.add(fixName); else editorSelection.delete(fixName);
+        }
+
+        function clearEditorSelection() {
+            editorSelection.forEach(fixName => setLabelSelected(fixName, false));
+            editorSelection.clear();
+        }
+
+        function selectOnly(fixName) {
+            clearEditorSelection();
+            setLabelSelected(fixName, true);
+            refreshEditorHud();
+        }
+
+        function toggleSelection(fixName) {
+            setLabelSelected(fixName, !editorSelection.has(fixName));
+            refreshEditorHud();
+        }
+
+        // Binds drag + click/multiselect behavior to a waypoint's marker
+        // and creates its paired draggable label marker. Called once per
+        // fix from initWaypointsAndProcedures() when EDITOR_MODE is true.
+        function bindEditableLabel(waypointMarker, fixName) {
+            const [dx, dy] = getLabelOffset(fixName);
+            const labelMarker = L.marker(waypoints[fixName], {
+                icon: makeEditableLabelIcon(fixName, dx, dy),
+                pane: 'editorLabelsPane',
+                draggable: true,
+                autoPan: true
+            }).addTo(map);
+
+            editableLabels[fixName] = {
+                marker: labelMarker,
+                dx, dy,
+                originalDx: dx, originalDy: dy
+            };
+
+            let dragStartOffsets = null; // fixName -> [dx,dy] for every selected label, captured at dragstart
+
+            labelMarker.on('dragstart', () => {
+                // Dragging a label that isn't part of the current
+                // selection replaces the selection with just that label;
+                // dragging a label that IS selected drags the whole
+                // group together.
+                if (!editorSelection.has(fixName)) selectOnly(fixName);
+
+                const el = labelMarker.getElement();
+                const textEl = el && el.querySelector('.editable-label-text');
+                if (textEl) textEl.classList.add('is-dragging');
+
+                dragStartOffsets = {};
+                editorSelection.forEach(selFix => {
+                    const e = editableLabels[selFix];
+                    dragStartOffsets[selFix] = [e.dx, e.dy];
+                });
+                editableLabels[fixName]._dragAnchorContainerPoint = map.latLngToContainerPoint(labelMarker.getLatLng());
+            });
+
+            labelMarker.on('drag', () => {
+                const anchor = editableLabels[fixName]._dragAnchorContainerPoint;
+                const newPoint = map.latLngToContainerPoint(labelMarker.getLatLng());
+                const dxDelta = newPoint.x - anchor.x;
+                const dyDelta = newPoint.y - anchor.y;
+
+                editorSelection.forEach(selFix => {
+                    const entry = editableLabels[selFix];
+                    const start = dragStartOffsets[selFix];
+                    if (!start) return;
+                    entry.dx = Math.round(start[0] + dxDelta);
+                    entry.dy = Math.round(start[1] + dyDelta);
+                    updateEditableLabelTransform(selFix);
+                    // Every selected label's own marker LatLng must stay
+                    // pinned to its waypoint -- only the dragged marker
+                    // actually moves geographically during a Leaflet
+                    // drag, so snap it back and let the CSS transform
+                    // carry the visual offset instead.
+                    if (selFix === fixName) {
+                        entry.marker.setLatLng(waypoints[fixName]);
+                    }
+                });
+                refreshEditorHud();
+            });
+
+            labelMarker.on('dragend', () => {
+                const el = labelMarker.getElement();
+                const textEl = el && el.querySelector('.editable-label-text');
+                if (textEl) textEl.classList.remove('is-dragging');
+                editorSelection.forEach(selFix => markEditableLabelDirty(selFix));
+                refreshEditorHud();
+            });
+
+            labelMarker.on('click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                const additive = e.originalEvent.shiftKey || e.originalEvent.ctrlKey || e.originalEvent.metaKey;
+                if (additive) {
+                    toggleSelection(fixName);
+                } else {
+                    selectOnly(fixName);
+                }
+            });
+        }
+
+        // Nudges every currently-selected label by [ddx, ddy] pixels.
+        function nudgeSelection(ddx, ddy) {
+            if (editorSelection.size === 0) return;
+            editorSelection.forEach(fixName => {
+                const entry = editableLabels[fixName];
+                if (!entry) return;
+                entry.dx += ddx;
+                entry.dy += ddy;
+                updateEditableLabelTransform(fixName);
+                markEditableLabelDirty(fixName);
+            });
+            refreshEditorHud();
+        }
+
+        function resetSelection() {
+            if (editorSelection.size === 0) return;
+            editorSelection.forEach(fixName => {
+                const entry = editableLabels[fixName];
+                if (!entry) return;
+                entry.dx = entry.originalDx;
+                entry.dy = entry.originalDy;
+                updateEditableLabelTransform(fixName);
+                markEditableLabelDirty(fixName);
+            });
+            refreshEditorHud();
+        }
+
+        // A fix counts as "ever modified" if its current offset differs
+        // from the true hardcoded default, regardless of whether it was
+        // touched in this session or arrived already-modified from a
+        // previously loaded labelOffsets.json.
+        function isModifiedFromDefault(fixName) {
+            const entry = editableLabels[fixName];
+            if (!entry) return false;
+            return entry.dx !== DEFAULT_LABEL_OFFSET[0] || entry.dy !== DEFAULT_LABEL_OFFSET[1];
+        }
+
+        function getAllModifiedFixNames() {
+            return Object.keys(editableLabels).filter(isModifiedFromDefault);
+        }
+
+        function exportLabelOffsets() {
+            const modified = getAllModifiedFixNames();
+            if (modified.length === 0) {
+                alert('No label offsets differ from the default -- nothing to export.');
+                return;
+            }
+            const out = {};
+            modified.forEach(fixName => {
+                const entry = editableLabels[fixName];
+                out[fixName] = [entry.dx, entry.dy];
+            });
+            const blob = new Blob([JSON.stringify(out, null, 4)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'labelOffsets.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // Re-baseline every exported fix's "original" (session-load)
+            // value to what was just saved, so the is-dirty highlight
+            // reflects "changed since last export" going forward. This
+            // does NOT affect what counts as exportable next time --
+            // that's always re-derived from DEFAULT_LABEL_OFFSET, so
+            // fixes that are still non-default keep being included in
+            // every future export even if untouched since the last one.
+            modified.forEach(fixName => {
+                const entry = editableLabels[fixName];
+                entry.originalDx = entry.dx;
+                entry.originalDy = entry.dy;
+                markEditableLabelDirty(fixName);
+            });
+            refreshEditorHud();
+        }
+
+        // ---------------------------------------------------------------
+        // HUD: dirty/selection counts, the selection's current offset
+        // value, and Reset/Export buttons. Built once with a fixed
+        // structure and stable child element IDs so refreshEditorHud()
+        // can just update text content on every call without re-creating
+        // (and re-listener-ing) the buttons each time.
+        // ---------------------------------------------------------------
+        let editorHudEl = null;
+
+        function buildEditorHud() {
+            editorHudEl.innerHTML = `
+                <span class="hud-title">LABEL EDITOR</span>
+                <span class="hud-count">Selected: <span class="n" id="hud-selected-count">0</span></span>
+                <span class="hud-count">Modified: <span class="n" id="hud-dirty-count">0</span></span>
+                <span class="hud-offset" id="hud-offset-wrap" style="display:none;">Offset: <span class="n" id="hud-offset-value">--</span></span>
+                <button type="button" class="hud-btn" id="hud-reset-btn" disabled>Reset Selection</button>
+                <button type="button" class="hud-btn save-btn" id="hud-export-btn">Export labelOffsets.json</button>
+                <span class="hud-hint">Click/Shift+Click select &middot; Drag box multiselect &middot; Arrows nudge (Shift = 10px) &middot; Esc clear selection</span>
+            `;
+            document.getElementById('hud-reset-btn').addEventListener('click', () => resetSelection());
+            document.getElementById('hud-export-btn').addEventListener('click', () => exportLabelOffsets());
+        }
+
+        function refreshEditorHud() {
+            if (!editorHudEl) return;
+
+            document.getElementById('hud-selected-count').textContent = editorSelection.size;
+            document.getElementById('hud-dirty-count').textContent = getAllModifiedFixNames().length;
+            document.getElementById('hud-reset-btn').disabled = editorSelection.size === 0;
+
+            const offsetWrap = document.getElementById('hud-offset-wrap');
+            const offsetValue = document.getElementById('hud-offset-value');
+            if (editorSelection.size === 1) {
+                const fixName = [...editorSelection][0];
+                const entry = editableLabels[fixName];
+                offsetValue.textContent = `${fixName} [${entry.dx}, ${entry.dy}]`;
+                offsetWrap.style.display = '';
+            } else if (editorSelection.size > 1) {
+                // Multiple labels selected, possibly at different offsets
+                // (e.g. only some were nudged/dragged before extending the
+                // selection) -- show each one so it's unambiguous rather
+                // than picking one arbitrarily. Capped so a huge rubber-
+                // band selection doesn't blow out the HUD bar.
+                const selected = [...editorSelection];
+                const MAX_SHOWN = 6;
+                const parts = selected.slice(0, MAX_SHOWN).map(fixName => {
+                    const entry = editableLabels[fixName];
+                    return `${fixName} [${entry.dx}, ${entry.dy}]`;
+                });
+                if (selected.length > MAX_SHOWN) {
+                    parts.push(`+${selected.length - MAX_SHOWN} more`);
+                }
+                offsetValue.textContent = parts.join('  ·  ');
+                offsetWrap.style.display = '';
+            } else {
+                offsetWrap.style.display = 'none';
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Rubber-band multiselect: mousedown+drag on empty map area draws
+        // a selection box; on mouseup, every label whose screen position
+        // falls inside it gets selected.
+        // ---------------------------------------------------------------
+        function initRubberBandSelect() {
+            const container = map.getContainer();
+            let selecting = false;
+            let startPoint = null;
+            let boxEl = null;
+
+            container.addEventListener('mousedown', (e) => {
+                // Only start a rubber-band if the mousedown didn't land on
+                // a label itself (labels handle their own click/drag).
+                if (e.target.closest('.editable-label-text')) return;
+                if (e.button !== 0) return;
+
+                selecting = true;
+                startPoint = { x: e.clientX, y: e.clientY };
+                boxEl = document.createElement('div');
+                boxEl.className = 'editor-select-box';
+                document.body.appendChild(boxEl);
+                map.dragging.disable(); // don't pan the map while box-selecting
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!selecting) return;
+                const x = Math.min(startPoint.x, e.clientX);
+                const y = Math.min(startPoint.y, e.clientY);
+                const w = Math.abs(e.clientX - startPoint.x);
+                const h = Math.abs(e.clientY - startPoint.y);
+                boxEl.style.left = `${x}px`;
+                boxEl.style.top = `${y}px`;
+                boxEl.style.width = `${w}px`;
+                boxEl.style.height = `${h}px`;
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (!selecting) return;
+                selecting = false;
+                map.dragging.enable();
+
+                const rect = boxEl.getBoundingClientRect();
+                boxEl.remove();
+                boxEl = null;
+
+                // A near-zero-size box means this was just a click, not a
+                // drag -- treat it as "click on empty map = deselect".
+                if (rect.width < 3 && rect.height < 3) {
+                    clearEditorSelection();
+                    refreshEditorHud();
+                    return;
+                }
+
+                const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+                if (!additive) clearEditorSelection();
+
+                Object.keys(editableLabels).forEach(fixName => {
+                    const entry = editableLabels[fixName];
+                    const el = entry.marker.getElement();
+                    const textEl = el && el.querySelector('.editable-label-text');
+                    if (!textEl) return;
+                    const labelRect = textEl.getBoundingClientRect();
+                    const overlaps = !(labelRect.right < rect.left || labelRect.left > rect.right ||
+                                        labelRect.bottom < rect.top || labelRect.top > rect.bottom);
+                    if (overlaps) setLabelSelected(fixName, true);
+                });
+                refreshEditorHud();
+            });
+        }
+
+        function initEditorKeyboard() {
+            window.addEventListener('keydown', (e) => {
+                // Ignore arrow keys / Escape while focus is in a text
+                // input elsewhere on the page (e.g. the search box) so
+                // normal typing/cursor movement isn't hijacked.
+                const tag = document.activeElement && document.activeElement.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+                const step = e.shiftKey ? 10 : 1;
+                switch (e.key) {
+                    case 'ArrowUp': nudgeSelection(0, -step); e.preventDefault(); break;
+                    case 'ArrowDown': nudgeSelection(0, step); e.preventDefault(); break;
+                    case 'ArrowLeft': nudgeSelection(-step, 0); e.preventDefault(); break;
+                    case 'ArrowRight': nudgeSelection(step, 0); e.preventDefault(); break;
+                    case 'Escape': clearEditorSelection(); refreshEditorHud(); break;
+                }
+            });
+        }
+
+        function initLabelEditor() {
+            editorHudEl = document.createElement('div');
+            editorHudEl.className = 'editor-hud';
+            document.body.appendChild(editorHudEl);
+            buildEditorHud();
+            refreshEditorHud();
+
+            map.on('click', () => {
+                clearEditorSelection();
+                refreshEditorHud();
+            });
+
+            initRubberBandSelect();
+            initEditorKeyboard();
+
+            console.log(`Label editor mode active: ${Object.keys(editableLabels).length} editable labels. Click/drag to move, Shift/Ctrl/Cmd+click or drag-box to multiselect, arrow keys to nudge.`);
+        }
+
         // Waypoint filter definitions
         const RWY31_FILTER = [
             /^BP8\d\d$/,
@@ -1122,19 +1704,35 @@
             }
             wp = waypoints;
 
+            try {
+                const offsetsResponse = await fetch('data/labelOffsets.json');
+                if (offsetsResponse.ok) {
+                    labelOffsets = await offsetsResponse.json();
+                    console.log(`Label offsets loaded: ${Object.keys(labelOffsets).length} overrides.`);
+                }
+            } catch (err) {
+                console.warn("Label offsets (data/labelOffsets.json) unavailable, using defaults:", err);
+            }
+
             Object.keys(waypoints).forEach(fixName => {
                 const marker = L.marker(waypoints[fixName], { icon: triangleIcon })
                  .addTo(waypointsGroup);
-                 
-                 marker.bindTooltip(getWaypointLabel(fixName), {
-                    permanent: true,
-                    direction: 'top',
-                    className: 'fix-label',
-                    offset: [0, 8]
-                });
-                
+
+                if (EDITOR_MODE) {
+                    bindEditableLabel(marker, fixName);
+                } else {
+                    marker.bindTooltip(getWaypointLabel(fixName), {
+                        permanent: true,
+                        direction: 'top',
+                        className: 'fix-label',
+                        offset: getLabelOffset(fixName)
+                    });
+                }
+
                 waypointMarkers[fixName] = marker;
             });
+
+            if (EDITOR_MODE) initLabelEditor();
 
             buildApproachRadar(rwy13R, 312.5, "13R");
             buildApproachRadar(rwy13L, 312.5, "13L");
@@ -1295,7 +1893,7 @@
 			L.polyline([wp["BP812"], wp["BP813"], wp["LITKU"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["BP813"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP803"], wp["BADOV"]], sid31Style).addTo(sid31Group);
-			drawProcedure([{ at: "BP821", overfly: { inbound: 205, nextInbound: 300 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
+			drawProcedure([{ at: "BP821", overfly: { inbound: 205, nextInbound: 298 } },"PUCOG", "GILEP"], sid31Style, sid31Group);
 			L.polyline([wp["BP822"], wp["DUZLA"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP822"], wp["FAHAZ"]], sid31Style).addTo(sid31Group);
 			L.polyline([wp["BP822"], wp["GAZDA"]], sid31Style).addTo(sid31Group);
@@ -1593,8 +2191,8 @@
                 ui: {
                     marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0, pane: 'aircraftPane' }),
                     hitArea: L.circleMarker([0, 0], { radius: 9, opacity: 0, fillOpacity: 0, interactive: true, bubblingMouseEvents: false, pane: 'aircraftPane' }),
-                    speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 0, interactive: false, pane: 'aircraftPane' }),
-                    leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1, opacity: 0, interactive: false, pane: 'aircraftPane' }),
+                    speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 1, interactive: false, pane: 'aircraftPane' }),
+                    leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.5, opacity: 1, interactive: false, pane: 'aircraftPane' }),
                     dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0, pane: 'aircraftPane' })
                         .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label', offset: [0, -10], pane: 'aircraftPane' })
                 }
@@ -2103,6 +2701,7 @@
 
         // Input Engine Hooks monitoring search field typing events (Real-time tracking of FIX labels)
         document.getElementById('radar-search').addEventListener('input', function(e) {
+            if (EDITOR_MODE) return; // labels aren't tooltips in editor mode
             const query = e.target.value.toUpperCase().trim();
             
             Object.keys(waypointMarkers).forEach(fixName => {
@@ -2118,6 +2717,10 @@
 
         // Refresh all waypoint labels when the BP-prefix-stripping preference changes
         document.getElementById('strip-bp-prefix').addEventListener('change', function() {
+            if (EDITOR_MODE) {
+                Object.keys(editableLabels).forEach(fixName => refreshEditableLabelText(fixName));
+                return;
+            }
             const query = document.getElementById('radar-search').value.toUpperCase().trim();
             Object.keys(waypointMarkers).forEach(fixName => {
                 const marker = waypointMarkers[fixName];
