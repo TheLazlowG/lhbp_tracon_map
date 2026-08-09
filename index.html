@@ -10,11 +10,7 @@
 			<!-- --accent-rgb: 93, 235, 61; -->
 		<!-- } -->
 		body { margin: 0; background-color: #000; overflow: hidden; }
-html,body{width:100%;height:100%;}
-#app{display:flex;width:100vw;height:100vh;overflow:hidden;}
-#radar-scope{flex:1;height:100%;background:#080808;position:relative;}
-
-        
+        #radar-scope { width: 100vw; height: 100vh; background: #080808; }
         
         /* Dynamic Zulu Clock Header Indicator */
         .radar-clock-panel {
@@ -56,35 +52,39 @@ html,body{width:100%;height:100%;}
 
         /* Tactical Control Panel Wrapper (Sliding Container) */
         .radar-ui-wrapper {
-            position: relative;
-            width: 212px;
-            flex-shrink: 0;
-            display:flex;
-            align-items:flex-start;
-            overflow:visible;
-            transition:width .3s cubic-bezier(0.4,0,0.2,1);
+            position: absolute;
+            top: 0px;
+            right: 0px;
+            z-index: 1000;
+            display: flex;
+            align-items: flex-start;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0); /* Fully open by default */
         }
 
         /* Slide panel off-screen while preserving button width */
         .radar-ui-wrapper.collapsed {
-            width:0;
+            transform: translateX(calc(100% - 28px));
         }
 
         /* Collapsible Toggle Button pinned to Top-Left of Panel */
         .radar-ui-toggle-btn {
-            position:fixed;
-            top:10px;
-            right:212px;
-            background: rgba(8,8,8,.9);
-            border:1px solid #8A8A8A;
-            border-right:none;
-            color:#5DEB3D;
-            width:28px;
-            height:32px;
-            line-height:30px;
-            text-align:center;
-            cursor:pointer;
-            z-index:3000;
+            background: rgba(8, 8, 8, 0.9);
+            border: 1px solid #8A8A8A;
+            border-right: none;
+            color: #5DEB3D;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            width: 28px;
+            height: 32px;
+            line-height: 30px;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 2px 0 0 2px;
+            box-shadow: -2px 4px 8px rgba(0, 0, 0, 0.5);
+            margin-top: 10px;
         }
         .radar-ui-toggle-btn:hover {
             color: #ffffff;
@@ -133,21 +133,11 @@ html,body{width:100%;height:100%;}
             color: #8A8A8A;
             border-radius: 0 0 0 2px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            max-height: 100vh;
+            max-height: 95vh;
             overflow-y: auto;
             width: 180px;
             box-sizing: content-box;
         }
-
-        .radar-ui-wrapper.collapsed .radar-ui-panel{
-            width:0!important;
-            padding-left:0;
-            padding-right:0;
-            border:none;
-            opacity:0;
-            overflow:hidden;
-        }
-
         .radar-ui-title {
             font-size: 11px;
             font-weight: bold;
@@ -479,12 +469,10 @@ html,body{width:100%;height:100%;}
     </style>
 </head>
 <body>
-<div id="app">
     <div id="radar-clock" class="radar-clock-panel">00.00.0000 00:00:00Z</div>
     <div id="radar-metar" class="radar-metar-panel">METAR LHBP: LOADING...</div>
 
-    <div id="radar-scope"></div>
-<div class="radar-ui-wrapper" id="radar-ui-wrapper">
+    <div class="radar-ui-wrapper" id="radar-ui-wrapper">
         <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
         <div class="radar-ui-panel">
             <div class="radar-view-btn-row">
@@ -655,7 +643,7 @@ html,body{width:100%;height:100%;}
         </div>
     </div>
 
-    
+    <div id="radar-scope"></div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
@@ -697,12 +685,9 @@ html,body{width:100%;height:100%;}
             uiWrapper.classList.toggle('collapsed');
             if (uiWrapper.classList.contains('collapsed')) {
                 uiToggleBtn.textContent = '<';
-                uiToggleBtn.style.right='0px';
             } else {
                 uiToggleBtn.textContent = '>';
-                uiToggleBtn.style.right='212px';
             }
-            setTimeout(()=>map.invalidateSize(),310);
         });
 
         // ==========================================
@@ -3027,6 +3012,5 @@ html,body{width:100%;height:100%;}
 
         bootApp();
     </script>
-</div>
 </body>
 </html>
