@@ -254,6 +254,7 @@
         }
         .lara-fua-label.published { color: #FFC107; }
         .lara-fua-label.active { color: #FF3B30; }
+        .permanent-airspace-label { pointer-events: none; }
         .lara-fua-label-name {
             width: 100%;
             text-align: center;
@@ -3119,6 +3120,14 @@
                     existing.layer.setLatLngs(latlngs);
                     existing.layer.setStyle(styleForType(type));
                     existing.layer.setTooltipContent(buildTooltipHTML(record));
+
+                    if (existing.label && (type === 'P' || type === 'R')) {
+                        existing.label.setLatLng(existing.layer.getBounds().getCenter());
+                        const labelEl = existing.label.getElement();
+                        const nameEl = labelEl && labelEl.querySelector('.lara-fua-label-name');
+                        if (nameEl) nameEl.textContent = record.name || record.id || type;
+                    }
+
                     existing.record = record;
                     existing.signature = signature;
 
@@ -3140,9 +3149,66 @@
                     pane: 'airspacePane'
                 });
                 layer.bindTooltip(buildTooltipHTML(record), { sticky: true, className: 'airspace-tooltip' });
+
+                // P and R are permanently active (24/7), so give them the
+                // same visual label treatment as activated LARA/FUA airspaces.
+                let label = null;
+                if (type === 'P' || type === 'R') {
+                    const center = layer.getBounds().getCenter();
+                    const name = record.name || record.id || type;
+                    // PilotNet stores the actual static altitude limits in
+                    // the matching type entry, rather than on the top-level
+                    // record. Use the same heightFrom/heightTo representation
+                    // used by the LARA/FUA labels.
+                    const staticEntry = Array.isArray(record.types)
+                        ? record.types.find(t =>
+                            t &&
+                            t.type &&
+                            t.type !== LARA_FUA_TYPE &&
+                            t.heightFrom !== undefined &&
+                            t.heightTo !== undefined
+                        )
+                        : null;
+
+                    const lower = staticEntry?.heightFrom;
+                    const upper = staticEntry?.heightTo;
+
+                    const formatPermanentAlt = (value, fallback) => {
+                        if (value === null || value === undefined || value === '') return fallback;
+
+                        // PilotNet altitude values are already expressed in feet.
+                        const n = Number(value);
+                        if (!Number.isFinite(n)) return String(value);
+
+                        return String(Math.round(n / 100));
+                    };
+
+                    const lowerText = formatPermanentAlt(lower, 'SFC');
+                    const upperText = formatPermanentAlt(upper, 'UNL');
+
+                    label = L.marker(center, {
+                        pane: 'airspaceLabelPane',
+                        interactive: false,
+                        icon: L.divIcon({
+                            className: 'lara-fua-label-icon',
+                            html: `<div class="lara-fua-label active permanent-airspace-label">
+                                <div class="lara-fua-label-name">${String(name).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}</div>
+                                <div class="lara-fua-label-details">
+                                    <span class="lara-fua-label-alt">
+                                        <span class="lara-fua-label-alt-top">${upperText}</span>
+                                        <span class="lara-fua-label-alt-bottom">${lowerText}</span>
+                                    </span>
+                                </div>
+                            </div>`,
+                            iconSize: null
+                        })
+                    });
+                    label.addTo(map);
+                }
+
                 getOrCreateTypeGroup(type).addLayer(layer);
 
-                airspaceIndex.set(id, { record, layer, type, signature });
+                airspaceIndex.set(id, { record, layer, type, signature, label });
             }
 
             function removeAirspace(id) {
@@ -3150,6 +3216,7 @@
                 if (!existing) return;
                 const group = typeGroups.get(existing.type);
                 if (group) group.removeLayer(existing.layer);
+                if (existing.label) map.removeLayer(existing.label);
                 airspaceIndex.delete(id);
             }
 
@@ -3547,8 +3614,10 @@
                     const adhocOk = !isAdhocRecord(entry.record) || showAdhoc;
                     if (typeEnabled && adhocOk) {
                         restoreLayerVisualStyle(entry.layer, styleForType(entry.type));
+                        if (entry.label) entry.label.setOpacity(1);
                     } else {
                         entry.layer.setStyle(HIDDEN_STYLE);
+                        if (entry.label) entry.label.setOpacity(0);
                     }
                 });
 
