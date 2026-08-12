@@ -223,6 +223,72 @@
         .leaflet-tooltip.airspace-tooltip::before {
             display: none;
         }
+        .lara-fua-label-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+        .lara-fua-label-icon {
+            width: max-content !important;
+            height: max-content !important;
+        }
+        .lara-fua-label {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: max-content;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 11px;
+            font-weight: normal;
+            line-height: 1;
+            white-space: nowrap;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            text-shadow:
+                -1px -1px 0 rgba(0,0,0,0.95),
+                 1px -1px 0 rgba(0,0,0,0.95),
+                -1px  1px 0 rgba(0,0,0,0.95),
+                 1px  1px 0 rgba(0,0,0,0.95),
+                 0 0 3px rgba(0,0,0,0.95);
+        }
+        .lara-fua-label.published { color: #FFC107; }
+        .lara-fua-label.active { color: #FF3B30; }
+        .lara-fua-label-name {
+            width: 100%;
+            text-align: center;
+            line-height: 1.05;
+            margin-bottom: 3px;
+        }
+        .lara-fua-label-details {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: max-content;
+            gap: 7px;
+            line-height: 1;
+        }
+        .lara-fua-label-time {
+            min-width: 38px;
+            text-align: center;
+        }
+        .lara-fua-label-alt {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            font-size: 11px;
+            line-height: 0.9;
+        }
+        .lara-fua-label-alt-top {
+            padding-bottom: 1px;
+            border-bottom: 1px solid currentColor;
+        }
+        .lara-fua-label-alt-bottom {
+            padding-top: 1px;
+        }
+
         .radar-ui-control {
             display: flex;
             align-items: center;
@@ -558,50 +624,22 @@
 
             <div class="radar-ui-section">Airspaces</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-prohibited" checked> PROHIBITED
+                <input type="checkbox" id="layer-airspace-all" checked> SHOW AIRSPACES
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-restricted" checked> RESTRICTED
+                <input type="checkbox" id="layer-airspace-activated" checked> SHOW ACTIVATED
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-danger" checked> DANGER
+                <input type="checkbox" id="layer-airspace-scheduled"> SHOW SCHEDULED
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-fir"> FIR
+                <input type="checkbox" id="layer-airspace-adhoc"> SHOW ADHOC (LHZX)
             </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-cta"> CTA
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-tma"> TMA
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-ctr"> CTR
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-mctr"> MCTR
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-mtma"> MTMA
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-rmz"> RMZ/TMZ
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-tra"> TRA
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-glider"> GLIDER
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-dropzone"> DROPZONE
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-aerobatics"> AEROBATICS
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-other"> OTHER
-            </label>
+            <!-- Populated at runtime by AirspaceManager with one checkbox
+                 per airspace `type` value actually present in the PilotNet
+                 data (CTR, TMA, D, P, R, etc.). LARA_FUA overlays are
+                 excluded from this list per spec. -->
+            <div id="airspace-type-filters"></div>
 
             <div class="radar-ui-section">Weather</div>
             <label class="radar-ui-control">
@@ -715,18 +753,21 @@
             setCheckbox('layer-ground-features', false);
             setCheckbox('layer-stands', false);
 			setCheckbox('show-ground-traffic', false);
+            setCheckbox('layer-airspace-all', true);
         });
         document.getElementById('twr-view-btn').addEventListener('click', function() {
             map.setView(INITIAL_VIEW_CENTER, TWR_VIEW_ZOOM);
             setCheckbox('layer-ground-features', true);
             setCheckbox('layer-stands', true);
 			setCheckbox('show-ground-traffic', true);
+            setCheckbox('layer-airspace-all', false);
         });
         document.getElementById('gnd-view-btn').addEventListener('click', function() {
             map.setView(INITIAL_VIEW_CENTER, GND_VIEW_ZOOM);
             setCheckbox('layer-ground-features', true);
             setCheckbox('layer-stands', true);
 			setCheckbox('show-ground-traffic', true);
+            setCheckbox('layer-airspace-all', false);
         });
 
         // ==========================================
@@ -948,6 +989,15 @@
         map.getPane('taxiwayLinesPane').style.zIndex = 380;
         map.createPane('runwayLinesPane');
         map.getPane('runwayLinesPane').style.zIndex = 390;
+        // Airspaces must render below SID/STAR procedures.
+        // SID/STAR remain on Leaflet's default overlayPane (z-index 400).
+        map.createPane('airspacePane');
+        map.getPane('airspacePane').style.zIndex = 395;
+
+        // Airspace labels use the same pane so they stay below SID/STAR too.
+        map.createPane('airspaceLabelPane');
+        map.getPane('airspaceLabelPane').style.zIndex = 395;
+
         map.createPane('aircraftPane');
         map.getPane('aircraftPane').style.zIndex = 700;
 
@@ -1083,26 +1133,31 @@
         const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5 };
         const holdingStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4 };
 
-        // Airspace boundary styles - one per airspace type so each can be
-        // tweaked independently later. Prohibited/Restricted/Danger areas
-        // use red outlines (solid/dashed/dotted respectively) since they
-        // carry the highest operational significance; everything else uses
-        // a neutral gray outline.
-        const airspaceProhibitedStyle = { color: '#FF3B30', weight: 1.4, opacity: 0.85, fill: false };
-        const airspaceRestrictedStyle = { color: '#FF3B30', weight: 1.2, opacity: 0.75, fill: false, dashArray: '6, 4' };
-        const airspaceDangerStyle = { color: '#FF3B30', weight: 1.2, opacity: 0.75, fill: false, dashArray: '1, 4', lineCap: 'round' };
-        const airspaceFirStyle = { color: '#9E9E9E', weight: 1.4, opacity: 0.55, fill: false };
-        const airspaceCtaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceTmaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceCtrStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceMctrStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceMtmaStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceRmzStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceTraStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceGliderStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceDropzoneStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceAerobaticsStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
-        const airspaceOtherStyle = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        // Airspace boundary styles. Preserves the existing visual language
+        // (red outlines for the highest-significance categories, neutral
+        // gray for everything else) but is now applied by AirspaceManager
+        // dynamically, keyed by the PilotNet record's own `type` value,
+        // since the set of types is discovered from the live API data
+        // rather than fixed in advance.
+        const airspaceStyleByType = {
+            // P (Prohibited) and R (Restricted) airspace is treated as
+            // always active -- these are permanently-effective airspace
+            // classes, not scheduled/activated like LARA_FUA reservations
+            // -- so they're styled identically to an ACTIVE LARA_FUA
+            // overlay (red outline + 5% red fill) rather than the plain
+            // outline-only red used for less time-critical categories.
+            'P': { color: '#FF3B30', weight: 1, opacity: 1, fill: true, fillColor: '#FF3B30', fillOpacity: 0.1 },  // Prohibited
+            'R': { color: '#FF3B30', weight: 1, opacity: 1, fill: true, fillColor: '#FF3B30', fillOpacity: 0.1 },  // Restricted
+            'D': { color: '#FF3B30', weight: 1, opacity: 1, fill: false, dashArray: '1, 4', lineCap: 'round' }, // Danger
+            'FIR': { color: '#9E9E9E', weight: 1.4, opacity: 0.55, fill: false },
+        };
+        const airspaceStyleDefault = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+
+        // LARA_FUA overlays are independent of the static airspace styling
+        // above -- drawn as separate overlay polygons per spec, not merged
+        // into or replacing the underlying static airspace's own style.
+        const laraFuaPublishedStyle = { color: '#FFC107', weight: 1, opacity: 1, fill: true, fillColor: '#FFC107', fillOpacity: 0.05 };
+        const laraFuaActiveStyle = { color: '#FF3B30', weight: 1, opacity: 1, fill: true, fillColor: '#FF3B30', fillOpacity: 0.1 };
 
         const taxiwayStyle = { stroke: false, fillColor: '#2B2B2B', fillOpacity: 1, pane: 'taxiwaysFillPane' };
         const apronStyle = { stroke: false, fillColor: '#242424', fillOpacity: 1, pane: 'apronsPane' };
@@ -1120,24 +1175,6 @@
         const extensions31Group = L.layerGroup().addTo(map);
         const holdingGroup = L.layerGroup(); 
 
-        // Airspace sublayers, one per type, so each can be toggled
-        // independently in the settings panel. Prohibited/Restricted/Danger
-        // are visible by default; the rest start hidden.
-        const airspaceProhibitedGroup = L.layerGroup().addTo(map);
-        const airspaceRestrictedGroup = L.layerGroup().addTo(map);
-        const airspaceDangerGroup = L.layerGroup().addTo(map);
-        const airspaceFirGroup = L.layerGroup();
-        const airspaceCtaGroup = L.layerGroup();
-        const airspaceTmaGroup = L.layerGroup();
-        const airspaceCtrGroup = L.layerGroup();
-        const airspaceMctrGroup = L.layerGroup();
-        const airspaceMtmaGroup = L.layerGroup();
-        const airspaceRmzGroup = L.layerGroup();
-        const airspaceTraGroup = L.layerGroup();
-        const airspaceGliderGroup = L.layerGroup();
-        const airspaceDropzoneGroup = L.layerGroup();
-        const airspaceAerobaticsGroup = L.layerGroup();
-        const airspaceOtherGroup = L.layerGroup();
         const taxiwaysGroup = L.layerGroup();
         const apronsGroup = L.layerGroup();
         const runwaysGroup = L.layerGroup();
@@ -2582,21 +2619,6 @@
             'layer-extensions-13': extensions13Group,
             'layer-extensions-31': extensions31Group,
             'layer-holding': holdingGroup,
-            'layer-airspace-prohibited': airspaceProhibitedGroup,
-            'layer-airspace-restricted': airspaceRestrictedGroup,
-            'layer-airspace-danger': airspaceDangerGroup,
-            'layer-airspace-fir': airspaceFirGroup,
-            'layer-airspace-cta': airspaceCtaGroup,
-            'layer-airspace-tma': airspaceTmaGroup,
-            'layer-airspace-ctr': airspaceCtrGroup,
-            'layer-airspace-mctr': airspaceMctrGroup,
-            'layer-airspace-mtma': airspaceMtmaGroup,
-            'layer-airspace-rmz': airspaceRmzGroup,
-            'layer-airspace-tra': airspaceTraGroup,
-            'layer-airspace-glider': airspaceGliderGroup,
-            'layer-airspace-dropzone': airspaceDropzoneGroup,
-            'layer-airspace-aerobatics': airspaceAerobaticsGroup,
-            'layer-airspace-other': airspaceOtherGroup,
             'layer-ground-features': groundFeaturesGroup,
             'layer-sid31': sid31Group,
             'layer-sid13': sid13lGroup,
@@ -2886,110 +2908,720 @@
             }
         }
 
-        // Load Hungarian airspace boundaries (FIR/CTA/TMA/MCTR/MTMA) from AIP-derived data.
-        // Classify an airspace by name/properties into one of the per-type
-        // groups, returning both the target layer group and its style.
-        // Map from an airspace's "category" property (authoritative, when present)
-        // to its target layer group + style.
-        const AIRSPACE_CATEGORY_MAP = {
-            'prohibited': { group: () => airspaceProhibitedGroup, style: () => airspaceProhibitedStyle },
-            'restricted': { group: () => airspaceRestrictedGroup, style: () => airspaceRestrictedStyle },
-            'danger':     { group: () => airspaceDangerGroup, style: () => airspaceDangerStyle },
-            'fir':        { group: () => airspaceFirGroup, style: () => airspaceFirStyle },
-            'cta':        { group: () => airspaceCtaGroup, style: () => airspaceCtaStyle },
-            'tma':        { group: () => airspaceTmaGroup, style: () => airspaceTmaStyle },
-            'tma_foreign':{ group: () => airspaceTmaGroup, style: () => airspaceTmaStyle },
-            'ctr':        { group: () => airspaceCtrGroup, style: () => airspaceCtrStyle },
-            'mctr':       { group: () => airspaceMctrGroup, style: () => airspaceMctrStyle },
-            'mtma':       { group: () => airspaceMtmaGroup, style: () => airspaceMtmaStyle },
-            'rmz':        { group: () => airspaceRmzGroup, style: () => airspaceRmzStyle },
-            'tmz':        { group: () => airspaceRmzGroup, style: () => airspaceRmzStyle },
-            'tra':        { group: () => airspaceTraGroup, style: () => airspaceTraStyle },
-            'glider':     { group: () => airspaceGliderGroup, style: () => airspaceGliderStyle },
-            'dropzone':   { group: () => airspaceDropzoneGroup, style: () => airspaceDropzoneStyle },
-            'aerobatics': { group: () => airspaceAerobaticsGroup, style: () => airspaceAerobaticsStyle },
-        };
+        // ==========================================================
+        // AirspaceManager
+        //
+        // Owns the entire airspace subsystem. PilotNet is the sole data
+        // source (no static GeoJSON): every record it returns is rendered
+        // directly, except LARA_FUA records, which are drawn as separate
+        // overlays above the normal airspaces rather than being merged
+        // into them. Polls every 5 minutes; on each refresh only the
+        // airspaces that actually changed (added/removed/geometry/
+        // activation) are touched -- nothing is blindly redrawn.
+        //
+        // The rest of the app only calls AirspaceManager.init() (from
+        // bootApp). Everything else here is private.
+        // ==========================================================
+        const AirspaceManager = (function() {
 
-        function classifyAirspace(props) {
-            const category = ((props && props.category) || '').toLowerCase().trim();
-            if (category && AIRSPACE_CATEGORY_MAP[category]) {
-                const entry = AIRSPACE_CATEGORY_MAP[category];
-                return { group: entry.group(), style: entry.style() };
+            // ---- Config -------------------------------------------------
+
+            const PILOTNET_URL = 'https://api.pilotnet.hu/rest/airspace';
+            const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes, per spec
+            const LARA_FUA_TYPE = 'LARA_FUA';
+
+            // ---- State ----------------------------------------------------
+
+            // Normal (non-LARA_FUA) airspaces: id -> {
+            //   record, layer, type, signature
+            // }. `signature` is a cheap fingerprint of the fields that
+            // matter for redraw decisions (geometry + activation), so a
+            // refresh can tell "unchanged" apart from "needs updating"
+            // without a deep object diff every poll.
+            const airspaceIndex = new Map();
+
+            // LARA_FUA overlays, kept fully separate per spec ("do not
+            // enable/disable or modify the underlying static polygons").
+            const laraFuaIndex = new Map();
+
+            // 0 is used only for the initial full snapshot. After that,
+            // latestUpdatedAt becomes the Unix timestamp of the successful sync checkpoint.
+            let latestUpdatedAt = 0;
+            let hasInitialSnapshot = false;
+            let pollTimer = null;
+            let showAll = true;
+            let showActivated = true;
+            let showScheduled = true;
+            let showAdhoc = true;
+            let enabledTypes = null; // null = "all enabled" (not yet populated)
+            const discoveredTypes = new Set();
+
+            // ---- Leaflet layer groups ------------------------------------
+
+            // One sub-group per discovered `type`, all nested under one
+            // parent so the master "SHOW AIRSPACES" toggle can act on
+            // everything at once while per-type filtering still works.
+            const typeGroups = new Map(); // type -> L.LayerGroup
+            const airspaceParentGroup = L.layerGroup().addTo(map);
+
+            // LARA_FUA overlays: independent layer, always drawn above the
+            // normal airspaces, never toggled by the type filters.
+            const laraFuaGroup = L.layerGroup().addTo(map);
+
+            function getOrCreateTypeGroup(type) {
+                let group = typeGroups.get(type);
+                if (!group) {
+                    group = L.layerGroup().addTo(airspaceParentGroup);
+                    typeGroups.set(type, group);
+                }
+                return group;
             }
 
-            // Fallback for data without a "category" property: guess from the name.
-            const name = (props && props.name) || '';
-            const upper = name.toUpperCase();
+            // ---- Styling --------------------------------------------------
 
-            if (/\bPROHIBITED\b/.test(upper) || /\bLHP\d/.test(upper)) {
-                return { group: airspaceProhibitedGroup, style: airspaceProhibitedStyle };
-            }
-            if (/\bRESTRICTED\b/.test(upper) || /\bLHR\d/.test(upper)) {
-                return { group: airspaceRestrictedGroup, style: airspaceRestrictedStyle };
-            }
-            if (/\bDANGER\b/.test(upper) || /\bLHD\d/.test(upper)) {
-                return { group: airspaceDangerGroup, style: airspaceDangerStyle };
-            }
-            if (upper.includes('FIR')) {
-                return { group: airspaceFirGroup, style: airspaceFirStyle };
-            }
-            if (upper.includes('MCTR')) {
-                return { group: airspaceMctrGroup, style: airspaceMctrStyle };
-            }
-            if (upper.includes('MTMA')) {
-                return { group: airspaceMtmaGroup, style: airspaceMtmaStyle };
-            }
-            if (upper.includes('CTR')) {
-                return { group: airspaceCtrGroup, style: airspaceCtrStyle };
-            }
-            if (upper.includes('CTA')) {
-                return { group: airspaceCtaGroup, style: airspaceCtaStyle };
-            }
-            if (upper.includes('TMA')) {
-                return { group: airspaceTmaGroup, style: airspaceTmaStyle };
-            }
-            if (upper.includes('RMZ') || upper.includes('TMZ')) {
-                return { group: airspaceRmzGroup, style: airspaceRmzStyle };
-            }
-            if (upper.includes('GLIDER')) {
-                return { group: airspaceGliderGroup, style: airspaceGliderStyle };
-            }
-            return { group: airspaceOtherGroup, style: airspaceOtherStyle };
-        }
+            // ---- Canonical PilotNet model helpers ---------------------------
+            //
+            // record.types is an array of { type, isActive, ... } entries.
+            // A record can carry more than one entry (e.g. a static
+            // classification entry alongside a LARA_FUA entry for the same
+            // airspace), so these helpers each search `types` for the
+            // entry that answers their specific question, rather than
+            // assuming a single type per record.
 
-        async function loadAirspaces() {
-            try {
-                const response = await fetch('data/airspaces.geojson');
+            // The record's static airspace type (CTR, TMA, D, P, R, etc.)
+            // -- the first types[] entry that ISN'T LARA_FUA. Returns
+            // "OTHER" if types is missing/empty, or "LARA_FUA" if every
+            // entry present is a LARA_FUA entry (i.e. this record has no
+            // static classification at all, only a LARA/FUA overlay).
+            function getStaticType(record) {
+                if (!Array.isArray(record?.types)) return "OTHER";
+                const staticEntry = record.types.find(t => t && t.type !== LARA_FUA_TYPE);
+                return staticEntry ? staticEntry.type : LARA_FUA_TYPE;
+            }
+
+            // True if this record carries a LARA_FUA entry at all
+            // (published or active) -- i.e. it should get a LARA/FUA
+            // overlay drawn, regardless of that entry's isActive state.
+            function isPublished(record) {
+                if (!Array.isArray(record?.types)) return false;
+                return record.types.some(t => t && t.type === LARA_FUA_TYPE);
+            }
+
+            // True only if this record's LARA_FUA entry is currently
+            // active (isActive === true). A published-but-not-yet-active
+            // LARA_FUA entry returns false here (renders yellow, not red).
+            function isActive(record) {
+                if (!Array.isArray(record?.types)) return false;
+                const laraEntry = record.types.find(t => t && t.type === LARA_FUA_TYPE);
+                return !!laraEntry && laraEntry.isActive === true;
+            }
+
+            function styleForType(type) {
+                return airspaceStyleByType[type] || airspaceStyleDefault;
+            }
+
+            function styleForLaraFua(active) {
+                return active ? laraFuaActiveStyle : laraFuaPublishedStyle;
+            }
+
+            // ---- Change detection ------------------------------------------
+
+            // Cheap fingerprint covering exactly the fields that should
+            // trigger a redraw/restyle if they change: coordinates and
+            // the types array (which carries both static classification
+            // and LARA_FUA activation state). Deliberately excludes
+            // fields that wouldn't need the polygon itself touched.
+            function computeSignature(record) {
+                const coordsKey = record.coordinates ? JSON.stringify(record.coordinates) : '';
+                const typesKey = record.types ? JSON.stringify(record.types) : '';
+                return `${coordsKey}|${typesKey}|${record.name || ''}`;
+            }
+
+            function buildTooltipHTML(record) {
+                const name = record.name || 'AIRSPACE';
+                const type = getStaticType(record);
+                const lower = record.lower || record.lowerLimit || '?';
+                const upper = record.upper || record.upperLimit || '?';
+                let html = `${name}${type ? ` (${type})` : ''}<br>${lower} - ${upper}`;
+                if (isPublished(record)) {
+                    const color = isActive(record) ? '#FF3B30' : '#FFC107';
+                    const status = isActive(record) ? 'ACTIVE' : 'PUBLISHED';
+                    html += `<br><span style="color:${color};">LARA/FUA ${status}</span>`;
+                }
+                return html;
+            }
+
+            function buildLaraFuaTooltipHTML(record) {
+                const name = record.name || 'LARA/FUA';
+                const active = isActive(record);
+                const status = active ? 'ACTIVE' : 'PUBLISHED';
+                const color = active ? '#FF3B30' : '#FFC107';
+                return `${name} (LARA/FUA)<br><span style="color:${color};">${status}</span>`;
+            }
+
+            // Converts record.coordinates -- the canonical PilotNet
+            // geometry field -- into the [[lat,lon],...] (or
+            // [[[lat,lon],...],...] for multi-ring) shape Leaflet's
+            // L.polygon expects. Coordinates are already [lat, lon]
+            // pairs (confirmed against live API data), so no axis-order
+            // conversion is needed. No GeoJSON handling here at all --
+            // record.geometry is never referenced by this subsystem.
+            function extractLatLngs(record) {
+                const coords = record?.coordinates;
+                if (!Array.isArray(coords) || coords.length === 0) return null;
+
+                // Single ring: [[lat, lon], [lat, lon], ...]
+                if (Array.isArray(coords[0]) && typeof coords[0][0] === "number") {
+                    return coords.map(([lat, lon]) => [lat, lon]);
+                }
+
+                // Multiple rings: [[[lat,lon],...], [[lat,lon],...]]
+                return coords.map(ring => ring.map(([lat, lon]) => [lat, lon]));
+            }
+
+            // ---- Normal airspace rendering (add / update in place / remove) ----
+
+            function renderAirspace(record) {
+                const id = record.name || String(record.id);
+                if (!id) {
+                    console.warn('AirspaceManager: skipping record with no id', record);
+                    return;
+                }
+
+                const type = getStaticType(record);
+
+                if (type !== "LARA_FUA") {
+                    discoveredTypes.add(type);
+                }
+
+                const signature = computeSignature(record);
+                const existing = airspaceIndex.get(id);
+
+                if (existing && existing.signature === signature) {
+                    // Nothing that affects the drawn polygon changed --
+                    // still refresh the tooltip in case display-only
+                    // fields changed, but skip touching the layer/style.
+                    existing.record = record;
+                    existing.layer.setTooltipContent(buildTooltipHTML(record));
+                    return;
+                }
+
+                const latlngs = extractLatLngs(record);
+                if (!latlngs) {
+                    console.warn(`AirspaceManager: record "${id}" has no usable geometry, skipping`, record);
+                    return;
+                }
+
+                if (existing) {
+                    // Geometry and/or activation changed: update the
+                    // EXISTING layer in place (setLatLngs + setStyle)
+                    // rather than removing and recreating it.
+                    existing.layer.setLatLngs(latlngs);
+                    existing.layer.setStyle(styleForType(type));
+                    existing.layer.setTooltipContent(buildTooltipHTML(record));
+                    existing.record = record;
+                    existing.signature = signature;
+
+                    // The type itself could change between polls; if so,
+                    // move the layer to the correct type group rather
+                    // than leaving it filed under its old type.
+                    if (existing.type !== type) {
+                        const oldGroup = typeGroups.get(existing.type);
+                        if (oldGroup) oldGroup.removeLayer(existing.layer);
+                        getOrCreateTypeGroup(type).addLayer(existing.layer);
+                        existing.type = type;
+                    }
+                    return;
+                }
+
+                // New airspace: create once.
+                const layer = L.polygon(latlngs, {
+                    ...styleForType(type),
+                    pane: 'airspacePane'
+                });
+                layer.bindTooltip(buildTooltipHTML(record), { sticky: true, className: 'airspace-tooltip' });
+                getOrCreateTypeGroup(type).addLayer(layer);
+
+                airspaceIndex.set(id, { record, layer, type, signature });
+            }
+
+            function removeAirspace(id) {
+                const existing = airspaceIndex.get(id);
+                if (!existing) return;
+                const group = typeGroups.get(existing.type);
+                if (group) group.removeLayer(existing.layer);
+                airspaceIndex.delete(id);
+            }
+
+            // ---- LARA_FUA overlay rendering (independent of normal airspaces) ----
+
+            function getLaraFuaEntry(record) {
+                if (!Array.isArray(record?.types)) return null;
+                return record.types.find(t => t && t.type === LARA_FUA_TYPE) || null;
+            }
+
+            function formatLaraFuaTime(value) {
+                if (!value) return '--.--';
+
+                // PilotNet supplies ISO timestamps with their local offset
+                // (e.g. +02:00). Convert them to UTC before displaying.
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '--.--';
+
+                const hours = String(date.getUTCHours()).padStart(2, '0');
+                const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                return `${hours}:${minutes}`;
+            }
+
+            function formatLaraFuaAltitude(value) {
+                if (value === null || value === undefined || value === '') return '--';
+                const feetHundreds = Math.round(Number(value) / 100);
+                if (!Number.isFinite(feetHundreds)) return '--';
+                return String(feetHundreds).padStart(2, '0');
+            }
+
+            function getLaraFuaLabelData(record) {
+                const entry = getLaraFuaEntry(record);
+                return {
+                    name: record.name || entry?.name || String(record.id || 'LARA/FUA'),
+                    fromTime: formatLaraFuaTime(entry?.fromDate),
+                    toTime: formatLaraFuaTime(entry?.toDate),
+                    upper: formatLaraFuaAltitude(entry?.heightTo),
+                    lower: formatLaraFuaAltitude(entry?.heightFrom)
+                };
+            }
+
+            function buildLaraFuaLabelHTML(record) {
+                const active = isActive(record);
+                const d = getLaraFuaLabelData(record);
+                return `
+                    <div class="lara-fua-label ${active ? 'active' : 'published'}">
+                        <div class="lara-fua-label-name">${d.name}</div>
+                        <div class="lara-fua-label-details">
+                            <span class="lara-fua-label-time">${d.fromTime}</span>
+                            <span class="lara-fua-label-alt">
+                                <span class="lara-fua-label-alt-top">${d.upper}</span>
+                                <span class="lara-fua-label-alt-bottom">${d.lower}</span>
+                            </span>
+                            <span class="lara-fua-label-time">${d.toTime}</span>
+                        </div>
+                    </div>`;
+            }
+
+            function getLaraFuaLabelPosition(latlngs) {
+                if (!Array.isArray(latlngs) || !latlngs.length) return null;
+                try {
+                    return L.polygon(latlngs).getBounds().getCenter();
+                } catch (err) {
+                    return null;
+                }
+            }
+
+            function createLaraFuaLabel(record, latlngs) {
+                const position = getLaraFuaLabelPosition(latlngs);
+                if (!position) return null;
+
+                const icon = L.divIcon({
+                    className: 'lara-fua-label-icon',
+                    html: buildLaraFuaLabelHTML(record),
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                });
+
+                return L.marker(position, {
+                    icon,
+                    interactive: false,
+                    keyboard: false,
+                    pane: 'airspaceLabelPane',
+                    zIndexOffset: 0
+                });
+            }
+
+            function updateLaraFuaLabel(existing, record, latlngs) {
+                if (!existing.label) {
+                    existing.label = createLaraFuaLabel(record, latlngs);
+                    if (existing.label) existing.label.addTo(laraFuaGroup);
+                    return;
+                }
+
+                const position = getLaraFuaLabelPosition(latlngs);
+                if (position) existing.label.setLatLng(position);
+
+                existing.label.setIcon(L.divIcon({
+                    className: 'lara-fua-label-icon',
+                    html: buildLaraFuaLabelHTML(record),
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                }));
+            }
+
+            function renderLaraFua(record) {
+                const id = record.name || String(record.id);
+                if (!id) {
+                    console.warn('AirspaceManager: skipping LARA_FUA record with no id', record);
+                    return;
+                }
+
+                const signature = computeSignature(record);
+                const existing = laraFuaIndex.get(id);
+
+                if (existing && existing.signature === signature) {
+                    existing.record = record;
+                    existing.layer.setTooltipContent(buildLaraFuaTooltipHTML(record));
+                    updateLaraFuaLabel(existing, record, extractLatLngs(record));
+                    return;
+                }
+
+                const latlngs = extractLatLngs(record);
+                if (!latlngs) {
+                    console.warn(`AirspaceManager: LARA_FUA record "${id}" has no usable geometry, skipping`, record);
+                    return;
+                }
+
+                const style = styleForLaraFua(isActive(record));
+
+                if (existing) {
+                    existing.layer.setLatLngs(latlngs);
+                    existing.layer.setStyle(style);
+                    existing.layer.setTooltipContent(buildLaraFuaTooltipHTML(record));
+                    existing.record = record;
+                    existing.signature = signature;
+                    updateLaraFuaLabel(existing, record, latlngs);
+                    return;
+                }
+
+                const layer = L.polygon(latlngs, {
+                    ...style,
+                    pane: 'airspacePane'
+                });
+                layer.bindTooltip(buildLaraFuaTooltipHTML(record), { sticky: true, className: 'airspace-tooltip' });
+                layer.addTo(laraFuaGroup);
+
+                const label = createLaraFuaLabel(record, latlngs);
+                if (label) label.addTo(laraFuaGroup);
+
+                laraFuaIndex.set(id, { record, layer, label, signature });
+            }
+
+            function removeLaraFua(id) {
+                const existing = laraFuaIndex.get(id);
+                if (!existing) return;
+                laraFuaGroup.removeLayer(existing.layer);
+                if (existing.label) laraFuaGroup.removeLayer(existing.label);
+                laraFuaIndex.delete(id);
+            }
+
+            // ---- PilotNet fetch + diff --------------------------------------
+
+            async function fetchPilotnet(updatedAt) {
+                const url = `${PILOTNET_URL}?updatedAt=${encodeURIComponent(updatedAt)}`;
+                const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const geojson = await response.json();
+                return response.json();
+            }
 
-                let count = 0;
+            async function refresh() {
+                const requestedUpdatedAt = latestUpdatedAt;
+                const requestStartedAt = Math.floor(Date.now() / 1000);
+                const requestMode = requestedUpdatedAt === 0 ? 'INITIAL FULL SYNC' : 'INCREMENTAL SYNC';
 
-                L.geoJSON(geojson, {
-                    style: function(feature) {
-                        return classifyAirspace(feature.properties).style;
-                    },
-                    onEachFeature: function(feature, layer) {
-                        const p = feature.properties || {};
-                        if (p.name) {
-                            const lower = p.lower || '?';
-                            const upper = p.upper || '?';
-                            const cls = p.class ? ` (Class ${p.class})` : '';
-                            layer.bindTooltip(
-                                `${p.name}${cls}<br>${lower} - ${upper}`,
-                                { sticky: true, className: 'airspace-tooltip' }
-                            );
-                        }
-                        classifyAirspace(p).group.addLayer(layer);
-                        count++;
+                console.groupCollapsed(`AirspaceManager: ${requestMode} ${new Date().toISOString()}`);
+                console.log('PilotNet request:', {
+                    mode: requestMode,
+                    updatedAt: requestedUpdatedAt,
+                    updatedAtISO: requestedUpdatedAt ? new Date(requestedUpdatedAt * 1000).toISOString() : 'FULL DATASET',
+                    url: `${PILOTNET_URL}?updatedAt=${encodeURIComponent(requestedUpdatedAt)}`
+                });
+
+                let response;
+                try {
+                    response = await fetchPilotnet(latestUpdatedAt);
+                } catch (err) {
+                    console.warn('AirspaceManager: PilotNet fetch failed, keeping last known state:', err);
+                    console.groupEnd();
+                    return;
+                }
+
+                // Live response shape is an envelope, not a bare array:
+                // { result: boolean, messages: [...], data: [...] }
+                let records = response;
+                if (response && !Array.isArray(response) && Array.isArray(response.data)) {
+                    if (response.result === false) {
+                        console.warn('AirspaceManager: PilotNet reported an error result:', response.messages);
+                        console.groupEnd();
+                        return;
+                    }
+                    if (Array.isArray(response.messages) && response.messages.length > 0) {
+                        console.warn('AirspaceManager: PilotNet returned messages alongside data:', response.messages);
+                    }
+                    records = response.data;
+                }
+
+                if (!Array.isArray(records)) {
+                    console.warn('AirspaceManager: unexpected PilotNet response shape, expected an array (or {data: array})', response);
+                    console.groupEnd();
+                    return;
+                }
+
+                const seenAirspaceIds = new Set();
+                const seenLaraFuaIds = new Set();
+                const addedAirspaces = [];
+                const changedAirspaces = [];
+                const addedLaraFua = [];
+                const changedLaraFua = [];
+
+                records.forEach((record) => {
+                    if (!record) return;
+                    const id = record.name || (record.id != null ? String(record.id) : null);
+                    if (!id) return;
+
+                    if (record.updatedAt && record.updatedAt > latestUpdatedAt) {
+                        console.log(`AirspaceManager: source updatedAt advanced ${latestUpdatedAt} -> ${record.updatedAt} (record "${id}")`);
+                        latestUpdatedAt = record.updatedAt;
+                    }
+
+                    if (isPublished(record)) {
+                        seenLaraFuaIds.add(id);
+                        const before = laraFuaIndex.get(id);
+                        const beforeSignature = before?.signature;
+                        renderLaraFua(record);
+                        const afterSignature = computeSignature(record);
+                        if (!before) addedLaraFua.push(id);
+                        else if (beforeSignature !== afterSignature) changedLaraFua.push(id);
+                    } else {
+                        seenAirspaceIds.add(id);
+                        const before = airspaceIndex.get(id);
+                        const beforeSignature = before?.signature;
+                        renderAirspace(record);
+                        const afterSignature = computeSignature(record);
+                        if (!before) addedAirspaces.push(id);
+                        else if (beforeSignature !== afterSignature) changedAirspaces.push(id);
                     }
                 });
 
-                console.log(`Airspaces loaded: ${count} boundaries.`);
-            } catch (err) {
-                console.warn("Airspaces (data/airspaces.geojson) unavailable:", err);
+                // Only a full snapshot can prove that an airspace was removed.
+                // Incremental PilotNet responses contain changed records, so
+                // treating every omitted record as removed would incorrectly
+                // delete unchanged airspaces on every poll.
+                const removedAirspaces = [];
+                const removedLaraFua = [];
+                if (requestedUpdatedAt === 0) {
+                    Array.from(airspaceIndex.keys()).forEach((id) => {
+                        if (!seenAirspaceIds.has(id)) {
+                            removeAirspace(id);
+                            removedAirspaces.push(id);
+                        }
+                    });
+                    Array.from(laraFuaIndex.keys()).forEach((id) => {
+                        if (!seenLaraFuaIds.has(id)) {
+                            removeLaraFua(id);
+                            removedLaraFua.push(id);
+                        }
+                    });
+                }
+
+                // Regenerating the type-filter checkbox list is cheap
+                // (a couple dozen DOM nodes at most) so it's simply
+                // rebuilt whenever anything was added or removed, rather
+                // than trying to cheaply detect "did the SET of types
+                // change" separately from "did the counts change" --
+                // that distinction isn't worth the extra bookkeeping.
+                const changedCount = addedAirspaces.length + changedAirspaces.length + addedLaraFua.length + changedLaraFua.length;
+                const removedCount = removedAirspaces.length + removedLaraFua.length;
+
+                if (changedCount > 0 || removedCount > 0) {
+                    renderTypeFilterUI();
+                    applyFilters();
+                }
+
+                console.log('AirspaceManager: refresh summary', {
+                    normal: { added: addedAirspaces.length, changed: changedAirspaces.length, removed: removedAirspaces.length },
+                    laraFua: { added: addedLaraFua.length, changed: changedLaraFua.length, removed: removedLaraFua.length },
+                    recordsReceived: records.length
+                });
+
+                if (addedAirspaces.length) console.log('AirspaceManager: added:', addedAirspaces);
+                if (changedAirspaces.length) console.log('AirspaceManager: changed:', changedAirspaces);
+                if (removedAirspaces.length) console.log('AirspaceManager: removed:', removedAirspaces);
+                if (addedLaraFua.length) console.log('AirspaceManager: LARA_FUA added:', addedLaraFua);
+                if (changedLaraFua.length) console.log('AirspaceManager: LARA_FUA changed:', changedLaraFua);
+                if (removedLaraFua.length) console.log('AirspaceManager: LARA_FUA removed:', removedLaraFua);
+
+                // The initial request is intentionally a full snapshot. Once
+                // it succeeds, use the request timestamp as the checkpoint for
+                // subsequent five-minute incremental requests.
+                if (requestedUpdatedAt === 0) hasInitialSnapshot = true;
+                latestUpdatedAt = requestStartedAt;
+                console.log(`AirspaceManager: next incremental updatedAt=${latestUpdatedAt} (${new Date(latestUpdatedAt * 1000).toISOString()})`);
+                console.groupEnd();
             }
-        }
+
+            // ---- Filters (type checkboxes generated from real data + master toggle) ----
+
+            function renderTypeFilterUI() {
+                const container = document.getElementById('airspace-type-filters');
+                if (!container) return;
+
+                if (enabledTypes === null) {
+                    // Default view: only Prohibited (P) and Restricted (R)
+                    // static airspaces are visible. Other types remain
+                    // available as filters but start disabled.
+                    enabledTypes = new Set(
+                        Array.from(discoveredTypes).filter(t => t === 'P' || t === 'R')
+                    );
+                }
+                // Preserve the enabled/disabled state of types the user has
+                // already interacted with. Newly discovered types stay
+                // disabled by default.
+                discoveredTypes.forEach((t) => {
+                    if (!typeGroups.has(t)) getOrCreateTypeGroup(t);
+                });
+
+                container.innerHTML = '';
+                Array.from(discoveredTypes).sort().forEach((type) => {
+                    const label = document.createElement('label');
+                    label.className = 'radar-ui-control';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `airspace-type-${type.toLowerCase()}`;
+                    checkbox.checked = enabledTypes.has(type);
+                    checkbox.addEventListener('change', () => {
+                        if (checkbox.checked) enabledTypes.add(type);
+                        else enabledTypes.delete(type);
+                        applyFilters();
+                    });
+
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(' ' + type));
+                    container.appendChild(label);
+                });
+            }
+
+            // Hides/shows a single layer via setStyle (opacity/fillOpacity
+            // 0) rather than removing it from its group -- this works
+            // correctly under both Leaflet's SVG and Canvas renderers
+            // (this app runs with preferCanvas: true, and Canvas-rendered
+            // layers have no _path DOM element to toggle directly), and
+            // avoids having to recompute/reapply the layer's real style
+            // (type color, active-state fill, etc.) every time it's shown
+            // again -- restoreLayerVisualStyle() does that instead.
+            const HIDDEN_STYLE = { opacity: 0, fillOpacity: 0, interactive: false };
+
+            function restoreLayerVisualStyle(layer, style) {
+                layer.setStyle(Object.assign({ interactive: true }, style));
+            }
+
+            function isAdhocRecord(record) {
+                const name = record && record.name;
+                return typeof name === 'string' && name.toUpperCase().startsWith('LHZX');
+            }
+
+            // Selecting multiple types shows their union: each type's own
+            // sub-group is simply shown/hidden independently, so multiple
+            // enabled types are naturally a union with no extra logic.
+            function applyFilters() {
+                if (!showAll) {
+                    if (map.hasLayer(airspaceParentGroup)) map.removeLayer(airspaceParentGroup);
+                    if (map.hasLayer(laraFuaGroup)) map.removeLayer(laraFuaGroup);
+                    return;
+                }
+                if (!map.hasLayer(airspaceParentGroup)) map.addLayer(airspaceParentGroup);
+                if (!map.hasLayer(laraFuaGroup)) map.addLayer(laraFuaGroup);
+
+                typeGroups.forEach((group, type) => {
+                    const typeEnabled = enabledTypes !== null && enabledTypes.has(type);
+                    if (typeEnabled) {
+                        if (!airspaceParentGroup.hasLayer(group)) airspaceParentGroup.addLayer(group);
+                    } else {
+                        if (airspaceParentGroup.hasLayer(group)) airspaceParentGroup.removeLayer(group);
+                    }
+                });
+
+                // "Show adhoc (LHZX)" filters individual static-airspace
+                // layers by name prefix, independent of the type filters
+                // above -- an LHZX record still respects its own type's
+                // checkbox too (both conditions must hold to be visible).
+                airspaceIndex.forEach((entry) => {
+                    const typeEnabled = enabledTypes === null || enabledTypes.has(entry.type);
+                    const adhocOk = !isAdhocRecord(entry.record) || showAdhoc;
+                    if (typeEnabled && adhocOk) {
+                        restoreLayerVisualStyle(entry.layer, styleForType(entry.type));
+                    } else {
+                        entry.layer.setStyle(HIDDEN_STYLE);
+                    }
+                });
+
+                // LARA_FUA overlays: "Show activated" / "Show scheduled"
+                // filter by the record's own activation state
+                // (isActive(record) = activated, published-but-not-yet-
+                // active = scheduled). These are independent of the
+                // master "SHOW AIRSPACES" type filters, since LARA_FUA
+                // overlays were never part of the type-filter list.
+                laraFuaIndex.forEach((entry) => {
+                    const active = isActive(entry.record);
+                    const visible = active ? showActivated : showScheduled;
+                    if (visible) {
+                        restoreLayerVisualStyle(entry.layer, styleForLaraFua(active));
+                        if (entry.label) entry.label.setOpacity(1);
+                    } else {
+                        entry.layer.setStyle(HIDDEN_STYLE);
+                        if (entry.label) entry.label.setOpacity(0);
+                    }
+                });
+            }
+
+            function wireFilterControls() {
+                const showAllCheckbox = document.getElementById('layer-airspace-all');
+                if (showAllCheckbox) {
+                    showAll = showAllCheckbox.checked;
+                    showAllCheckbox.addEventListener('change', () => {
+                        showAll = showAllCheckbox.checked;
+                        applyFilters();
+                    });
+                }
+
+                const showActivatedCheckbox = document.getElementById('layer-airspace-activated');
+                if (showActivatedCheckbox) {
+                    showActivated = showActivatedCheckbox.checked;
+                    showActivatedCheckbox.addEventListener('change', () => {
+                        showActivated = showActivatedCheckbox.checked;
+                        applyFilters();
+                    });
+                }
+
+                const showScheduledCheckbox = document.getElementById('layer-airspace-scheduled');
+                if (showScheduledCheckbox) {
+                    showScheduled = showScheduledCheckbox.checked;
+                    showScheduledCheckbox.addEventListener('change', () => {
+                        showScheduled = showScheduledCheckbox.checked;
+                        applyFilters();
+                    });
+                }
+
+                const showAdhocCheckbox = document.getElementById('layer-airspace-adhoc');
+                if (showAdhocCheckbox) {
+                    showAdhoc = showAdhocCheckbox.checked;
+                    showAdhocCheckbox.addEventListener('change', () => {
+                        showAdhoc = showAdhocCheckbox.checked;
+                        applyFilters();
+                    });
+                }
+            }
+
+            // ---- Public API -------------------------------------------------
+
+            async function init() {
+                wireFilterControls();
+                await refresh();
+                renderTypeFilterUI();
+                applyFilters();
+                pollTimer = setInterval(refresh, POLL_INTERVAL_MS);
+            }
+
+            return { init };
+        })();
+
 
         async function bootApp() {
             await initWaypointsAndProcedures();
@@ -2997,7 +3629,7 @@
             await loadGroundFeatures();
             await loadTaxiwayLines();
             await loadStands();
-            await loadAirspaces();
+            await AirspaceManager.init();
             // Initialize the runway-direction-dependent layers (extensions,
             // SID, STAR, 7XX/8XX waypoint filters) to the default direction
             // (13) now that every checkbox's change listener is registered.
