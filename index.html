@@ -29,6 +29,26 @@
             pointer-events: none;
         }
 
+        /* Data Source Status Panels (top-left, stacked) */
+        .radar-source-status-panel {
+            position: absolute;
+            left: 15px;
+            background: rgba(8, 8, 8, 0.4);
+            padding: 4px 6px;
+            z-index: 1000;
+            font-family: 'Google Sans Code', monospace;
+            color: #8A8A8A;
+            font-size: 12px;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+            line-height: 1.5;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #radar-airspace-status { top: 15px; }
+        #radar-rain-status { top: 76px; }
+        #radar-metar-status { top: 137px; }
+
         /* METAR Report Panel */
         .radar-metar-panel {
             position: absolute;
@@ -124,6 +144,25 @@
             border-color: #5DEB3D;
         }
 
+        /* RWY DIR button only: stacked two-line label (RWY DIR / <dir>)
+           so the direction number reads bigger than the shared 11px
+           .radar-reset-btn text -- other .radar-reset-btn buttons are
+           untouched since this only applies with the extra class. */
+        .radar-reset-btn.radar-reset-btn-2line {
+            line-height: 1.3;
+            padding-top: 4px;
+            padding-bottom: 4px;
+        }
+        .radar-reset-btn-2line .radar-reset-btn-line1 {
+            display: block;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        .radar-reset-btn-2line .radar-reset-btn-line2 {
+            display: block;
+            font-size: 15px;
+        }
+
         /* Tactical Control Panel UI */
         .radar-ui-panel {
             background: rgba(8, 8, 8, 0.9);
@@ -135,7 +174,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
             max-height: 95vh;
             overflow-y: auto;
-            width: 180px;
+            width: 200px;
             box-sizing: content-box;
         }
         .radar-ui-title {
@@ -370,6 +409,85 @@
             background: #222;
         }
 
+        /* Dual-thumb range slider (airspace floor/ceiling filters).
+           Two native <input type="range"> elements are stacked in the
+           same track: both share identical min/max/step and sit
+           absolutely positioned on top of one another so their thumbs
+           share one visual track, while a colored fill div behind them
+           shows the currently-selected [low, high] span. Each input's
+           own track is made transparent so only its thumb is visible,
+           and pointer-events are limited to the thumb itself (the
+           standard trick for two overlapping native range inputs so
+           both remain independently draggable). */
+        .radar-dual-slider {
+            position: relative;
+            height: 18px;
+            margin: 2px 0 4px 0;
+        }
+        .radar-dual-slider-track {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 3px;
+            transform: translateY(-50%);
+            background: #333;
+            border-radius: 2px;
+        }
+        .radar-dual-slider-fill {
+            position: absolute;
+            top: 50%;
+            height: 3px;
+            transform: translateY(-50%);
+            background: #5DEB3D;
+            border-radius: 2px;
+        }
+        .radar-dual-slider input[type="range"] {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            width: 100%;
+            height: 18px;
+            margin: 0;
+            background: transparent;
+            pointer-events: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .radar-dual-slider input[type="range"]::-webkit-slider-runnable-track {
+            background: transparent;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-track {
+            background: transparent;
+        }
+        .radar-dual-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            pointer-events: auto;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1px solid #5DEB3D;
+            cursor: pointer;
+            margin-top: -4.5px;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-thumb {
+            pointer-events: auto;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1px solid #5DEB3D;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .radar-dual-slider-labels {
+            display: flex;
+            justify-content: space-between;
+        }
+
         /* ATC Radio Frequency Link List */
         .radar-atc-links {
             display: flex;
@@ -585,6 +703,9 @@
 <body>
     <div id="radar-clock" class="radar-clock-panel">00.00.0000 00:00:00Z</div>
     <div id="radar-metar" class="radar-metar-panel">METAR LHBP: LOADING...</div>
+    <div id="radar-airspace-status" class="radar-source-status-panel">Airspaces by PilotNet.hu<br>Last update: --:--:--Z<br>Next update: --:--:--Z</div>
+    <div id="radar-rain-status" class="radar-source-status-panel">Weather radar by Rainviewer<br>Last update: --:--:--Z<br>Next update: --:--:--Z</div>
+    <div id="radar-metar-status" class="radar-source-status-panel">METAR by aviationweather.gov<br>Last update: --:--:--Z<br>Next update: --:--:--Z</div>
 
     <div class="radar-ui-wrapper" id="radar-ui-wrapper">
         <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
@@ -595,7 +716,7 @@
                 <button type="button" id="gnd-view-btn" class="radar-reset-btn">GND View</button>
             </div>
             <div class="radar-view-btn-row">
-                <button type="button" id="rwy-direction-btn" class="radar-reset-btn">RWY DIR: 31</button>
+                <button type="button" id="rwy-direction-btn" class="radar-reset-btn radar-reset-btn-2line"><span class="radar-reset-btn-line1">RWY DIR</span><span class="radar-reset-btn-line2">31</span></button>
             </div>
 
             <div class="radar-ui-title">Radar Search</div>
@@ -660,25 +781,29 @@
                 <input type="checkbox" id="layer-extensions-31" checked> RWY 31 EXTENSION
             </label>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
-            </label>
-            <label class="radar-ui-control">
                 <input type="checkbox" id="layer-ground-features"> GROUND FEATURES
             </label>
             <label class="radar-ui-control">
                 <input type="checkbox" id="layer-stands"> STANDS
             </label>
             <input type="checkbox" id="multi-select-tracks" checked style="display:none;">
-
-            <div class="radar-ui-section">Airspaces</div>
+			
+            <div class="radar-ui-section">Procedures</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-all" checked> SHOW AIRSPACES
+                <input type="checkbox" id="layer-sid13"> SID 13
             </label>
-            <!-- Populated at runtime by AirspaceManager: one row per
-                 discovered `type` (CTR, TMA, D, P, R, ADHOC, etc.), each
-                 with 3 checkboxes -- STATIC, SCHEDULED, ACTIVATED -- that
-                 control that type's visibility per LARA_FUA status. -->
-            <div id="airspace-type-filters"></div>
+			<label class="radar-ui-control">
+                <input type="checkbox" id="layer-sid31" checked> SID 31
+            </label>
+			<label class="radar-ui-control">
+                <input type="checkbox" id="layer-star13"> STAR 13
+            </label>
+			<label class="radar-ui-control">
+                <input type="checkbox" id="layer-star31" checked> STAR 31
+            </label>
+			<label class="radar-ui-control">
+                <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
+            </label>
 
             <div class="radar-ui-section">Weather</div>
             <label class="radar-ui-control">
@@ -690,21 +815,57 @@
                 <input type="range" id="rain-opacity-slider" class="radar-ui-slider" min="10" max="100" step="10" value="70">
             </div>
 
-            <div class="radar-ui-section">Departures</div>
+            <div class="radar-ui-section">Airspaces</div>
             <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid13"> SID 13
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid31" checked> SID 31
+                <input type="checkbox" id="layer-airspace-all" checked> SHOW AIRSPACES
             </label>
 
-            <div class="radar-ui-section">Arrivals</div>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-star13"> STAR 13
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-star31" checked> STAR 31
-            </label>
+            <!-- Floor/Ceiling altitude range filters. Each is a dual-
+                 thumb slider (two overlapping native <input type=range>
+                 elements) letting the user pick a [low, high] band.
+                 An airspace passes the combined filter when its own
+                 floor falls within the Floor range AND its own ceiling
+                 falls within the Ceiling range -- see
+                 isWithinAltitudeFilter in AirspaceManager. Values are
+                 in hundreds of feet (FL-style) from 0 to 600 (FL600 /
+                 60,000ft), matching the max altitude range PilotNet
+                 airspace data uses; the top step is treated as
+                 "and above" / UNL. -->
+            <div class="radar-slider-container">
+                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Floor Range</div>
+                <div class="radar-slider-output" id="airspace-floor-filter-val">SFC – UNL</div>
+                <div class="radar-dual-slider">
+                    <div class="radar-dual-slider-track"></div>
+                    <div class="radar-dual-slider-fill" id="airspace-floor-filter-fill"></div>
+                    <input type="range" id="airspace-floor-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0">
+                    <input type="range" id="airspace-floor-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600">
+                </div>
+            </div>
+
+            <div class="radar-slider-container">
+                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Ceiling Range</div>
+                <div class="radar-slider-output" id="airspace-ceiling-filter-val">SFC – UNL</div>
+                <div class="radar-dual-slider">
+                    <div class="radar-dual-slider-track"></div>
+                    <div class="radar-dual-slider-fill" id="airspace-ceiling-filter-fill"></div>
+                    <input type="range" id="airspace-ceiling-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0">
+                    <input type="range" id="airspace-ceiling-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600">
+                </div>
+            </div>
+
+            <!-- Populated at runtime by AirspaceManager: one row per
+                 discovered `type` (CTR, TMA, D, P, R, ADHOC, etc.), each
+                 with 3 checkboxes -- STATIC, SCHEDULED, ACTIVATED -- that
+                 control that type's visibility per LARA_FUA status. The
+                 3 buttons above act on an entire column at once: each
+                 click sets every type's checkbox in that column to the
+                 same state (see toggleAllForKey in AirspaceManager). -->
+            <div class="radar-view-btn-row" style="margin-top: 8px;">
+                <button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn" title="Toggle all Static">S</button>
+                <button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn" title="Toggle all Scheduled">SC</button>
+                <button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn" title="Toggle all Activated">A</button>
+            </div>
+            <div id="airspace-type-filters"></div>
 
             <div class="radar-ui-title" style="margin-top: 14px;">LHBP ATC Radio</div>
             <div class="radar-atc-links">
@@ -820,7 +981,7 @@
 
         function applyRwyDirection(direction) {
             currentRwyDirection = direction;
-            rwyDirectionBtn.textContent = `RWY DIR: ${direction}`;
+            rwyDirectionBtn.innerHTML = `<span class="radar-reset-btn-line1">RWY DIR</span><span class="radar-reset-btn-line2">${direction}</span>`;
 
             const is13 = direction === "13";
             setCheckbox('layer-extensions-13', is13);
@@ -868,6 +1029,17 @@
         });
 
         // ==========================================
+        // Shared UTC time formatter (HH:MM:SSZ)
+        // ==========================================
+        function formatZuluTime(epochSeconds) {
+            const d = new Date(epochSeconds * 1000);
+            const hours = String(d.getUTCHours()).padStart(2, '0');
+            const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(d.getUTCSeconds()).padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}Z`;
+        }
+
+        // ==========================================
         // Live Aviation Standard Zulu Clock Engine
         // ==========================================
         function updateRadarClock() {
@@ -913,10 +1085,19 @@
                 } else {
                     metarEl.textContent = `METAR ${METAR_STATION}: NO DATA`;
                 }
+                updateMetarStatusPanel();
             } catch (err) {
                 console.error("METAR fetch error:", err);
                 metarEl.textContent = `METAR ${METAR_STATION}: UNAVAILABLE`;
             }
+        }
+
+        function updateMetarStatusPanel() {
+            const el = document.getElementById('radar-metar-status');
+            if (!el) return;
+            const nowEpochSeconds = Math.floor(Date.now() / 1000);
+            const nextEpochSeconds = nowEpochSeconds + METAR_REFRESH_MS / 1000;
+            el.innerHTML = `METAR by aviationweather.gov<br>Last update: ${formatZuluTime(nowEpochSeconds)}<br>Next update: ${formatZuluTime(nextEpochSeconds)}`;
         }
         setInterval(updateMetar, METAR_REFRESH_MS);
         updateMetar(); // Immediate fetch call on parse
@@ -1105,7 +1286,10 @@
                 const latestFrame = frames[frames.length - 1];
 
                 // Skip if this is the same frame we're already displaying
-                if (rainLayer && rainLastFrameTime === latestFrame.time) return;
+                if (rainLayer && rainLastFrameTime === latestFrame.time) {
+                    updateRainStatusPanel(latestFrame.time);
+                    return;
+                }
 
                 const newLayer = buildRainLayer(latestFrame.path);
 
@@ -1115,14 +1299,23 @@
                         map.removeLayer(rainLayer);
                         rainLayer = newLayer;
                         rainLastFrameTime = latestFrame.time;
+                        updateRainStatusPanel(latestFrame.time);
                     });
                 } else {
                     rainLayer = newLayer;
                     rainLastFrameTime = latestFrame.time;
+                    updateRainStatusPanel(latestFrame.time);
                 }
             } catch (err) {
                 console.error('RainViewer fetch error:', err);
             }
+        }
+
+        function updateRainStatusPanel(lastFrameEpochSeconds) {
+            const el = document.getElementById('radar-rain-status');
+            if (!el) return;
+            const nextEpochSeconds = Math.floor(Date.now() / 1000) + RAIN_REFRESH_MS / 1000;
+            el.innerHTML = `Weather radar by Rainviewer<br>Last update: ${formatZuluTime(lastFrameEpochSeconds)}<br>Next update: ${formatZuluTime(nextEpochSeconds)}`;
         }
 
         document.getElementById('layer-rain').addEventListener('change', function(e) {
@@ -2070,13 +2263,6 @@
         // ==========================================
         let aircraftState = {};
         const SWEEP_INTERVAL_MS = 2000;
-        // NOTE: every sweep now goes through a public CORS proxy (see
-        // fetchLiveTraffic/CORS_PROXIES below), and those proxies apply
-        // their own rate limits independent of the underlying ADS-B source.
-        // At 2s/sweep this is ~30 requests/min per proxy, which fits inside
-        // corsproxy.io's documented free-tier limits for a single client,
-        // but if you start seeing frequent proxy failures in the console,
-        // raising this value is the first thing to try.
         const RENDER_DELAY_MS = 2000;
         const HISTORY_LENGTH = 30;
         // Set to 2 to only display every OTHER history dot (skips every 2nd
@@ -2577,7 +2763,7 @@
         }
         requestAnimationFrame(renderLoop);
 
-        function processAdsbTraffic(data, siteDomain) {
+        function processAdsbTraffic(data) {
             if (!data || !Array.isArray(data.ac)) throw new Error('Empty dataset returned');
             const targets = [];
             data.ac.forEach(ac => {
@@ -2609,7 +2795,7 @@
                 });
             });
             if (targets.length === 0) throw new Error('Zero targets inside tracking sector');
-            processTrafficTargets(targets, `${targets.length} targets`, siteDomain || 'adsb.fi');
+            processTrafficTargets(targets, `${targets.length} targets`, 'airplanes.live');
         }
 
         async function fetchJson(url) {
@@ -2618,75 +2804,17 @@
             return res.json();
         }
 
-        // Multiple community ADS-B aggregators are tried in order, since any
-        // single one can go offline or rate-limit without notice (as
-        // happened with airplanes.live). Each entry is a function that
-        // builds the URL for a given [lat, lon] + radius; response shape for
-        // all of these is the same ADSBExchange v2 style ({ac: [...]}) that
-        // processAdsbTraffic() already parses, so no per-source parsing
-        // logic is needed.
-        const TRAFFIC_SOURCES = [
-            {
-                name: 'airplanes.live',
-                buildUrl: (lat, lon, nm) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${nm}`
-            },
-            {
-                name: 'adsb.fi',
-                buildUrl: (lat, lon, nm) => `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/${nm}`
-            }
-        ];
-
-        // None of the above send Access-Control-Allow-Origin for arbitrary
-        // browser origins (confirmed against multiple community ADS-B APIs
-        // including localhost) -- these APIs are built for
-        // server-side/feeder use, not direct browser fetches from
-        // third-party pages. So every request is routed through a CORS
-        // proxy from the start rather than trying a direct fetch and
-        // falling back only after it fails; that just wastes a full
-        // request+rejection cycle on every single sweep for something we
-        // already know will fail.
-        //
-        // Two proxy backends are tried per source in case one is down or
-        // rate-limiting us -- corsproxy.io's free tier explicitly allows
-        // localhost as a dev origin (good for local testing) but applies
-        // heavy rate limiting; allorigins.win is the fallback.
-        const CORS_PROXIES = [
-            (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-            (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-        ];
-
-        // Index of the traffic source currently in use. Starts at 0 (the
-        // preferred source) and only advances forward on failure -- it never
-        // resets back to 0 automatically, since flapping between sources
-        // every sweep would be worse than just staying on whichever one is
-        // currently working.
-        let currentSourceIndex = 0;
-
         async function fetchLiveTraffic() {
             const [lat, lon] = RADAR_CENTER;
+            const targetUrl = `https://api.airplanes.live/v2/point/${lat}/${lon}/${RADAR_RADIUS_NM}`;
 
-            for (let attempt = 0; attempt < TRAFFIC_SOURCES.length; attempt++) {
-                const sourceIndex = (currentSourceIndex + attempt) % TRAFFIC_SOURCES.length;
-                const source = TRAFFIC_SOURCES[sourceIndex];
-                const targetUrl = source.buildUrl(lat, lon, RADAR_RADIUS_NM);
-
-                for (let p = 0; p < CORS_PROXIES.length; p++) {
-                    try {
-                        const data = await fetchJson(CORS_PROXIES[p](targetUrl));
-                        processAdsbTraffic(data, source.name);
-                        if (sourceIndex !== currentSourceIndex) {
-                            console.log(`Traffic source switched to ${source.name} (previous source failed).`);
-                        }
-                        currentSourceIndex = sourceIndex;
-                        return;
-                    } catch (err) {
-                        console.warn(`${source.name} via proxy #${p + 1} failed:`, err.message);
-                    }
-                }
+            try {
+                const data = await fetchJson(targetUrl);
+                processAdsbTraffic(data);
+            } catch (err) {
+                console.error("airplanes.live stream connection failure:", err.message);
+                setTrafficSource('failed');
             }
-
-            // Every source, through every proxy, failed this sweep.
-            setTrafficSource('failed');
         }
 
         function fetchRadarSweep() {
@@ -3070,26 +3198,92 @@
             // Set plus the global showActivated/showScheduled/showAdhoc
             // booleans. Each discovered type (including LARA_FUA_TYPE,
             // i.e. ADHOC) gets its own { static, scheduled, activated }
-            // triple:
-            //   static    - hides/shows this type's airspaces entirely
-            //               (the direct descendant of the original
-            //               per-type checkbox / ADHOC's SHOW ADHOC
-            //               checkbox). This is the ONLY one of the 3 that
-            //               affects visibility.
-            //   scheduled - when the record is published and NOT active,
-            //               show the LARA_FUA highlight style + label
-            //               instead of the normal/default style. Never
-            //               hides the record (see isHighlighted).
-            //   activated - same, for published + active records.
+            // triple, each independently hiding/showing a different
+            // subset of that type's records (see isRecordVisible):
+            //   static    - unpublished (plain, not currently published
+            //               via LARA_FUA) records of this type.
+            //   scheduled - published, NOT active records of this type.
+            //   activated - published AND active records of this type.
+            // Unchecking one only removes that subset -- e.g. turning off
+            // `static` still leaves that type's scheduled/activated
+            // (highlighted) records visible and independently toggleable.
             // null = "not yet populated" (before the first renderTypeFilterUI).
             let typeVisibility = null;
             const discoveredTypes = new Set();
 
             const DEFAULT_TYPE_VISIBILITY = Object.freeze({
                 static: true,
-                scheduled: false,
+                scheduled: true,
                 activated: true
             });
+
+            // ---- Altitude range filter -------------------------------------
+            //
+            // Two independent [low, high] bands, in feet, set by the Floor
+            // Range / Ceiling Range dual sliders. An airspace is visible
+            // only when its OWN floor sits inside floorMin..floorMax AND
+            // its own ceiling sits inside ceilMin..ceilMax -- so e.g.
+            // setting Floor to 0-0 and Ceiling to 60000-60000 isolates
+            // airspace running from the surface to unlimited, while a
+            // narrower Ceiling band (say 5000-10000) shows only airspace
+            // topping out in that slice regardless of where it starts.
+            // Bounds are in feet; UNBOUNDED_CEILING stands in for UNL
+            // (no numeric top) so it sorts above any real slider value.
+            const UNBOUNDED_CEILING = 999999;
+            const ALTITUDE_FILTER_MAX_FT = 60000; // slider's top step (FL600)
+
+            let altitudeFilter = {
+                floorMin: 0,
+                floorMax: ALTITUDE_FILTER_MAX_FT,
+                ceilMin: 0,
+                ceilMax: ALTITUDE_FILTER_MAX_FT
+            };
+
+            // A record's floor/ceiling for filtering purposes, in feet.
+            // Pulled from the same static (non-LARA_FUA) types[] entry
+            // used elsewhere for height display (see buildPermanentLabelHTML
+            // /buildTooltipHTML); ADHOC records (no static entry, only a
+            // LARA_FUA band) fall back to their LARA_FUA entry's own
+            // heightFrom/heightTo, same as buildTooltipHTML does. Missing
+            // floor defaults to the surface (0); missing/non-finite
+            // ceiling defaults to UNBOUNDED_CEILING (UNL) rather than 0,
+            // so an airspace with no stated top isn't filtered out by a
+            // low Ceiling Range setting.
+            function getAltitudeBand(record) {
+                const types = Array.isArray(record?.types) ? record.types : [];
+                const staticEntry = types.find(t =>
+                    t && t.type !== LARA_FUA_TYPE && (t.heightFrom !== undefined || t.heightTo !== undefined)
+                );
+                const laraEntry = types.find(t => t && t.type === LARA_FUA_TYPE);
+                const entry = staticEntry || laraEntry;
+
+                const floorRaw = entry ? entry.heightFrom : undefined;
+                const ceilRaw = entry ? entry.heightTo : undefined;
+
+                const floor = Number.isFinite(Number(floorRaw)) ? Number(floorRaw) : 0;
+                const ceil = Number.isFinite(Number(ceilRaw)) ? Number(ceilRaw) : UNBOUNDED_CEILING;
+
+                return { floor, ceil };
+            }
+
+            // True if the record's floor/ceiling both fall inside the
+            // currently-set Floor Range / Ceiling Range sliders. The top
+            // slider step (ALTITUDE_FILTER_MAX_FT) is treated as "and
+            // above" for the ceiling side, so dragging the Ceiling Range's
+            // high thumb all the way up still includes UNL airspace
+            // instead of excluding it for having no finite top.
+            function isWithinAltitudeFilter(record) {
+                const { floor, ceil } = getAltitudeBand(record);
+                const f = altitudeFilter;
+
+                if (floor < f.floorMin || floor > f.floorMax) return false;
+
+                const ceilMaxIsOpen = f.ceilMax >= ALTITUDE_FILTER_MAX_FT;
+                if (ceil < f.ceilMin) return false;
+                if (!ceilMaxIsOpen && ceil > f.ceilMax) return false;
+
+                return true;
+            }
 
             function getOrCreateTypeVisibility(type) {
                 let v = typeVisibility.get(type);
@@ -3185,21 +3379,31 @@
             // overlaid polygon. Unmatched (adhoc) LARA_FUA records use the
             // plain LARA_FUA style since they have no static type of their
             // own to fall back on.
-            // A static airspace that also carries a matched LARA_FUA
-            // entry is styled by its LARA_FUA activation state ONLY while
-            // that state's checkbox (SHOW ACTIVATED / SHOW SCHEDULED) is
-            // on -- this is a style substitution, not a second overlaid
-            // polygon. When the checkbox is off, the record still renders
-            // (it isn't hidden), just with its normal/default style
-            // instead of the highlight. Adhoc records (no static type of
-            // their own) fall back to airspaceStyleDefault rather than a
-            // real type style, since they have none.
+            //
+            // True if a published record's LARA_FUA state should currently
+            // be shown as a highlight (red/yellow style, LARA/FUA label
+            // text) rather than falling back to its plain static
+            // appearance. False for anything unpublished. This is the
+            // single source of truth for "highlighted or fallback",
+            // shared by styleForAirspace, labelHTMLFor, and applyFilters
+            // (label opacity) so the polygon style, label content, and
+            // label visibility can never disagree with each other.
+            function isHighlighted(record, type) {
+                if (!isPublished(record)) return false;
+                const v = typeVisibility ? typeVisibility.get(type) : null;
+                const active = isActive(record);
+                return v ? (active ? v.activated : v.scheduled) : true;
+            }
+
+            // isRecordVisible (see applyFilters) already gates published
+            // records on isHighlighted before they reach here for any
+            // type EXCEPT one with a real static classification (CTR,
+            // TMA, D, R, GLDR, etc.), where a record can be visible via
+            // its `static` box while NOT highlighted -- that's exactly
+            // the plain-static fallback case handled below.
             function styleForAirspace(record, type) {
                 if (isPublished(record)) {
-                    const active = isActive(record);
-                    const v = typeVisibility ? typeVisibility.get(type) : null;
-                    const highlight = v ? (active ? v.activated : v.scheduled) : (active || false);
-                    if (highlight) return styleForLaraFua(active);
+                    if (isHighlighted(record, type)) return styleForLaraFua(isActive(record));
                     return type === LARA_FUA_TYPE ? airspaceStyleDefault : styleForType(type);
                 }
                 return styleForType(type);
@@ -3323,14 +3527,33 @@
             // (see isPublished) -- they have no real fromDate/toDate to
             // show, so the LARA_FUA time+altitude label would just render
             // blank time fields. Everything else with a genuine LARA_FUA
-            // entry uses the full time+altitude label as before.
+            // entry uses the full time+altitude label, but only while
+            // that entry is actually highlighted (see isRecordVisible /
+            // styleForAirspace) -- if scheduled/activated is unchecked
+            // for this type, the polygon falls back to plain static
+            // styling, so the label falls back to the plain permanent
+            // one too, rather than showing LARA/FUA time text next to a
+            // polygon that no longer looks published.
             function labelHTMLFor(record, type) {
                 if (type === 'P' || type === 'R') return buildPermanentLabelHTML(record, type);
-                return isPublished(record) ? buildLaraFuaLabelHTML(record) : buildPermanentLabelHTML(record, type);
+                if (!isPublished(record)) return buildPermanentLabelHTML(record, type);
+                return isHighlighted(record, type) ? buildLaraFuaLabelHTML(record) : buildPermanentLabelHTML(record, type);
             }
 
             function renderAirspace(record) {
-                const id = record.name || String(record.id);
+                // Keyed by record.id, NOT record.name -- PilotNet reuses
+                // the same `name` across genuinely distinct airspaces that
+                // happen to share an identifier (e.g. LHPA covers both an
+                // MTMA+LARA_FUA record id 108648 and a separate MCTR
+                // record id 108651; same for LHBP, LHKE, LHPR). Keying by
+                // name meant the second one silently overwrote the first
+                // in airspaceIndex, so one of the two airspaces vanished
+                // entirely -- not a filter/visibility issue, it never
+                // reached the index at all. record.id is unique per
+                // record (verified against a live snapshot), so it's the
+                // correct primary key; record.name is kept only as a
+                // last-resort fallback for malformed records with no id.
+                const id = record.id != null ? String(record.id) : record.name;
                 if (!id) {
                     console.warn('AirspaceManager: skipping record with no id', record);
                     return;
@@ -3451,6 +3674,221 @@
                 airspaceIndex.delete(id);
             }
 
+            // ---- Source-data workaround: split multi-band records ----------
+            //
+            // Some PilotNet records bundle more than one genuinely distinct
+            // airspace into a single record's `types[]`, all sharing that
+            // one record's `coordinates` -- e.g. LHSNA (id 108576) carries
+            // TWO altitude bands, each with its own LARA_FUA activation
+            // (LHSN MTMA/A: 2000-5500ft, LHSN MTMA/B: 5500-9500ft), PLUS a
+            // third MTMA entry spanning the full 0-98425ft column -- the
+            // parent MTMA airspace that the two bands sit inside. Left as
+            // one record, getStaticType()'s types.find() silently picks
+            // only the FIRST non-LARA_FUA entry in array order (here: the
+            // TMA-A sub-band's own type, "TMA" -- not "MTMA") to classify
+            // the whole record, and getLaraFuaEntry()/isActive() likewise
+            // only ever see the first LARA_FUA entry, silently discarding
+            // the second band's activation state entirely, and the parent
+            // MTMA classification is never shown as its own airspace at
+            // all. Confirmed via a scan of a live snapshot: LHSNA, LHKE1A,
+            // LHKE2A, LHKE3A, and LHKE (id 108649, MCTR+CTR+LARA_FUA) all
+            // show this shape.
+            //
+            // Fix: split each affected record into one synthetic record
+            // PER distinct height band found in its `types[]`, all cloned
+            // from the original (same coordinates, id-prefix), each
+            // carrying only that band's entries -- INCLUDING a band with
+            // no LARA_FUA entry of its own, such as LHSN's full-column
+            // MTMA parent, which becomes its own MTMA airspace rather than
+            // being folded into or dropped in favor of its two internal
+            // sub-bands. Bands are identified by grouping types[] on
+            // numeric (heightFrom, heightTo) -- NOT the heightFromType/
+            // heightToType unit strings, which several paired static/
+            // LARA_FUA entries for the exact same band disagree on (e.g.
+            // CTR at heightFromType "AGL" vs its own LARA_FUA entry at
+            // "AMSL" for the identical numeric floor), so unit-string
+            // equality alone would wrongly treat them as different bands.
+            //
+            // Each split record's top-level `name` is taken from its OWN
+            // band's static (non-LARA_FUA) entry -- NOT copied from the
+            // original record's top-level name. The original record's
+            // name only ever matches ONE of its bands (whichever one
+            // PilotNet happened to name the parent record after -- e.g.
+            // record 108612 is named "LHTRA53L" after its low band, while
+            // its high band's own static entry is separately named
+            // "LHTRA53H"). Before this fix, every band cloned the SAME
+            // top-level name ("LHTRA53L") regardless of which band it
+            // actually was, so the high band silently masqueraded as the
+            // low band's name. That's mostly a cosmetic problem UNTIL
+            // PilotNet later sends a genuine top-level LARA_FUA record
+            // actually named "LHTRA53H" for that band's activation --
+            // mergeSplitLaraFuaRecords matches by exact top-level name,
+            // finds no static record named "LHTRA53H" (both split bands
+            // were misnamed "LHTRA53L"), and the LARA_FUA record falls
+            // through unmerged, rendering as ADHOC instead of TRA. A band
+            // with no static entry of its own (shouldn't normally happen,
+            // since a LARA_FUA-only band wouldn't need splitting from a
+            // sibling in the first place) falls back to the original
+            // record's name.
+            //
+            // A record with only one height-band group needs no split and
+            // is returned unchanged.
+            function splitMultiBandRecords(records) {
+                const result = [];
+                records.forEach((record) => {
+                    const types = Array.isArray(record.types) ? record.types : [];
+                    const groups = new Map(); // "from|to" -> types[]
+                    types.forEach((t) => {
+                        if (!t) return;
+                        const from = t.heightFrom;
+                        const to = t.heightTo;
+                        const key = `${from}|${to}`;
+                        let g = groups.get(key);
+                        if (!g) {
+                            g = { from, to, entries: [] };
+                            groups.set(key, g);
+                        }
+                        g.entries.push(t);
+                    });
+
+                    if (groups.size <= 1) {
+                        result.push(record);
+                        return;
+                    }
+
+                    const bandGroups = Array.from(groups.values());
+                    console.log(`AirspaceManager: splitting multi-band record "${record.name}" (id ${record.id}) into ${bandGroups.length} band(s)`, bandGroups.map(g => `${g.from}-${g.to}`));
+                    bandGroups.forEach((g, i) => {
+                        const staticEntry = g.entries.find(t => t && t.type !== LARA_FUA_TYPE);
+                        const bandName = staticEntry && staticEntry.name ? staticEntry.name : record.name;
+                        result.push({
+                            ...record,
+                            id: `${record.id}#${i}`,
+                            name: bandName,
+                            types: g.entries
+                        });
+                    });
+                });
+                return result;
+            }
+
+            // ---- Source-data workaround: known name mismatches between a
+            // ---- LARA_FUA-only record and its real static counterpart ----
+            //
+            // mergeSplitLaraFuaRecords (below) matches a LARA_FUA-only
+            // record to its static counterpart by exact `record.name`
+            // equality. That covers every split pair found EXCEPT LHUD:
+            // PilotNet names the static TIZ records "LHUD1"/"LHUD2" but
+            // their LARA_FUA activation records "LHUD_TIZ1"/"LHUD_TIZ2" --
+            // different name, though same numeric suffix, same height
+            // range (LHUD1: 0-9500ft matches LHUD_TIZ1; LHUD2: 2000-9500ft
+            // matches LHUD_TIZ2), and both are clearly the LARA_FUA
+            // activation for the neighbouring static TIZ record.
+            //
+            // This is NOT handled as a general "match by height range"
+            // rule -- checked against the full dataset, height range alone
+            // is far too noisy a signal (e.g. a LARA_FUA-only drone-zone
+            // record can coincidentally share a height range with a dozen
+            // unrelated NATURE RESERVE AREA polygons that just happen to
+            // start at ground level). Only these two pairs have BOTH a
+            // clear name relationship AND a matching height range, so
+            // they're listed explicitly here rather than inferred.
+            //
+            // Each entry remaps the LARA_FUA-only record's name to its
+            // static counterpart's name before the by-name grouping in
+            // mergeSplitLaraFuaRecords runs, so the existing merge logic
+            // picks it up with no other changes needed. If PilotNet ever
+            // starts naming these consistently, this table just stops
+            // matching anything and can be deleted.
+            const LARA_FUA_NAME_ALIASES = Object.freeze({
+                'LHUD_TIZ1': 'LHUD1',
+                'LHUD_TIZ2': 'LHUD2'
+            });
+
+            function applyLaraFuaNameAliases(records) {
+                records.forEach((record) => {
+                    if (!record || !record.name) return;
+                    const alias = LARA_FUA_NAME_ALIASES[record.name];
+                    if (!alias) return;
+                    const types = Array.isArray(record.types) ? record.types : [];
+                    const isLaraOnly = types.length > 0 && types.every(t => t && t.type === LARA_FUA_TYPE);
+                    if (!isLaraOnly) return;
+                    console.log(`AirspaceManager: renaming LARA_FUA-only record "${record.name}" (id ${record.id}) to "${alias}" to match its static counterpart`);
+                    record.name = alias;
+                });
+                return records;
+            }
+
+            // ---- Source-data workaround: merge split static/LARA_FUA pairs ----
+            //
+            // PilotNet is documented (and mostly behaves) as one record per
+            // airspace, with a static classification entry and a LARA_FUA
+            // entry living together in the same record's `types[]`. In
+            // practice it sometimes instead sends the static classification
+            // and the LARA_FUA activation as two SEPARATE top-level records
+            // that share the same `name` (different `id`, near-identical
+            // coordinates) -- e.g. one record with types:[GLDR] and another
+            // with types:[LARA_FUA], both named "LHSG123/S". Confirmed via
+            // a scan of a live snapshot: LHSG100, LHSG114, LHSG123/S, LHPR,
+            // LHPA, LHZX_DRDRONE9, LHNY2, LHD52, LHPA1 all showed this split
+            // in the same poll where LHBP and LHKE correctly carried both
+            // entries in one record -- so the source CAN merge them, it just
+            // doesn't always.
+            //
+            // Left alone, `refresh()` keys records by `name`, so the second
+            // record silently overwrites the first in airspaceIndex: the
+            // static (e.g. GLDR) polygon/label is discarded and the airspace
+            // ends up rendered as a bare LARA_FUA_TYPE record, i.e. filed
+            // under ADHOC instead of its real type.
+            //
+            // Fix: before any record reaches the render loop, group same-
+            // name records and fold any LARA_FUA-only ones into the static
+            // one(s) sharing that name, combining their `types[]`. The
+            // merged record keeps the static record's id/geometry -- the
+            // LARA_FUA-only record contributes only its `types` entries and
+            // is then dropped from the array, so getStaticType() sees both
+            // entries together exactly as if the source had merged them
+            // itself. Names with only static records, only LARA_FUA
+            // records, or already-merged records pass through unchanged.
+            // Names with more than one static record (ambiguous -- which
+            // one should absorb the LARA_FUA entry?) are left untouched and
+            // fall through to the existing per-id rendering, same as today.
+            // Same fallback applies to a LARA_FUA-only record arriving on
+            // its own during an incremental sync, with no static sibling
+            // present in that particular batch to merge into -- it renders
+            // under ADHOC as before, and gets merged retroactively next
+            // time its static sibling is included in a batch (e.g. the
+            // next full sync).
+            function mergeSplitLaraFuaRecords(records) {
+                const byName = new Map();
+                records.forEach((record) => {
+                    if (!record || !record.name) return;
+                    let group = byName.get(record.name);
+                    if (!group) {
+                        group = { statics: [], laraOnly: [] };
+                        byName.set(record.name, group);
+                    }
+                    const types = Array.isArray(record.types) ? record.types : [];
+                    const hasStatic = types.some(t => t && t.type !== LARA_FUA_TYPE);
+                    if (hasStatic) group.statics.push(record);
+                    else group.laraOnly.push(record);
+                });
+
+                const laraOnlyToDrop = new Set();
+                byName.forEach((group) => {
+                    if (group.statics.length !== 1 || group.laraOnly.length === 0) return;
+                    const staticRecord = group.statics[0];
+                    group.laraOnly.forEach((laraRecord) => {
+                        const laraTypes = (laraRecord.types || []).filter(t => t && t.type === LARA_FUA_TYPE);
+                        staticRecord.types = [...(staticRecord.types || []), ...laraTypes];
+                        laraOnlyToDrop.add(laraRecord);
+                        console.log(`AirspaceManager: merged LARA_FUA record (id ${laraRecord.id}) into static record (id ${staticRecord.id}), both named "${staticRecord.name}"`);
+                    });
+                });
+
+                return laraOnlyToDrop.size === 0 ? records : records.filter(r => !laraOnlyToDrop.has(r));
+            }
+
             // ---- LARA_FUA overlay rendering (independent of normal airspaces) ----
 
             function getLaraFuaEntry(record) {
@@ -3558,13 +3996,23 @@
                     return;
                 }
 
+                records = splitMultiBandRecords(records);
+                records = applyLaraFuaNameAliases(records);
+                records = mergeSplitLaraFuaRecords(records);
+
                 const seenAirspaceIds = new Set();
                 const addedAirspaces = [];
                 const changedAirspaces = [];
 
                 records.forEach((record) => {
                     if (!record) return;
-                    const id = record.name || (record.id != null ? String(record.id) : null);
+                    // Same key construction as renderAirspace -- must
+                    // match exactly, since this id is used to detect
+                    // added/changed/removed airspaces against
+                    // airspaceIndex, which renderAirspace populates using
+                    // its own id. See renderAirspace for why record.id
+                    // (not record.name) is the primary key.
+                    const id = record.id != null ? String(record.id) : record.name;
                     if (!id) return;
 
                     if (record.updatedAt && record.updatedAt > latestUpdatedAt) {
@@ -3635,6 +4083,16 @@
                 latestUpdatedAt = requestStartedAt;
                 console.log(`AirspaceManager: next incremental updatedAt=${latestUpdatedAt} (${new Date(latestUpdatedAt * 1000).toISOString()})`);
                 console.groupEnd();
+
+                updateAirspaceStatusPanel(requestStartedAt, requestStartedAt + POLL_INTERVAL_MS / 1000);
+            }
+
+            // ---- Status panel (top-left "Airspaces by PilotNet.hu") -------
+
+            function updateAirspaceStatusPanel(lastUpdateEpochSeconds, nextUpdateEpochSeconds) {
+                const el = document.getElementById('radar-airspace-status');
+                if (!el) return;
+                el.innerHTML = `Airspaces by PilotNet.hu<br>Last update: ${formatZuluTime(lastUpdateEpochSeconds)}<br>Next update: ${formatZuluTime(nextUpdateEpochSeconds)}`;
             }
 
             // ---- Filters (type checkboxes generated from real data + master toggle) ----
@@ -3722,6 +4180,36 @@
                 });
             }
 
+            // Sets every discovered type's checkbox for one column
+            // (static/scheduled/activated) to the same state in a single
+            // action, then re-renders the checkbox UI and re-applies
+            // filters once. Toggles rather than always turning on: if
+            // ANY type currently has that column unchecked, the button
+            // turns the whole column on (the more useful "restore
+            // everything" action); only when every type already has it
+            // checked does it turn the whole column off. This avoids the
+            // ambiguity of a plain toggle when rows are in a mixed state.
+            function toggleAllForKey(key) {
+                if (typeVisibility === null) typeVisibility = new Map();
+                discoveredTypes.forEach((t) => getOrCreateTypeVisibility(t));
+
+                const nextState = !Array.from(typeVisibility.values()).every(v => v[key]);
+                typeVisibility.forEach((v) => { v[key] = nextState; });
+
+                renderTypeFilterUI();
+                applyFilters();
+            }
+
+            // Wired once here (not inside renderTypeFilterUI, which reruns
+            // every time a new type is discovered) so the 3 column buttons
+            // never accumulate duplicate listeners.
+            const staticToggleBtn = document.getElementById('airspace-toggle-static-btn');
+            const scheduledToggleBtn = document.getElementById('airspace-toggle-scheduled-btn');
+            const activatedToggleBtn = document.getElementById('airspace-toggle-activated-btn');
+            if (staticToggleBtn) staticToggleBtn.addEventListener('click', () => toggleAllForKey('static'));
+            if (scheduledToggleBtn) scheduledToggleBtn.addEventListener('click', () => toggleAllForKey('scheduled'));
+            if (activatedToggleBtn) activatedToggleBtn.addEventListener('click', () => toggleAllForKey('activated'));
+
             // Hides/shows a single layer via setStyle (opacity/fillOpacity
             // 0) rather than removing it from its group -- this works
             // correctly under both Leaflet's SVG and Canvas renderers
@@ -3736,31 +4224,41 @@
                 layer.setStyle(Object.assign({ interactive: true }, style));
             }
 
-            // Per-record visibility comes ONLY from the type's `static`
-            // flag -- this is the direct descendant of the original
-            // per-type on/off checkbox, and matches ADHOC's old
-            // single-checkbox behavior too (ADHOC records are always
-            // published, so under the old model SHOW ADHOC was their only
-            // hide/show control). `scheduled`/`activated` never hide a
-            // record -- they only gate the highlight style and label
-            // opacity for published records, exactly like the old global
-            // SHOW ACTIVATED / SHOW SCHEDULED checkboxes did (see
-            // styleForAirspace and isHighlighted below).
+            // `static` only gates unpublished records (the plain, non-
+            // LARA_FUA airspace outline). Published records are gated by
+            // their own scheduled/activated flag instead, independent of
+            // `static` -- so unchecking static removes only the inactive/
+            // plain rendering of a type, while scheduled/activated
+            // records of that type stay controllable by their own boxes.
+            // P and R are always isPublished()+isActive() (see isActive),
+            // so their `static` checkbox has no effect at all -- they're
+            // gated entirely by `activated`; there is no "unpublished
+            // P/R" state to gate.
+            // Whether a record's polygon is drawn at all. This is
+            // deliberately NOT the same question as "is it highlighted"
+            // (see styleForAirspace): a record with a real static
+            // classification (CTR, TMA, D, R, GLDR, etc.) has a shape
+            // that exists independent of any LARA_FUA overlay, so
+            // unchecking `activated`/`scheduled` should only drop the
+            // highlight and fall back to the plain static polygon --
+            // not remove the polygon. It should disappear only when
+            // `static` is ALSO off. `static` is therefore a union with
+            // whichever of scheduled/activated currently applies, for
+            // any record that has a static type at all.
+            //
+            // A true ADHOC record (type === LARA_FUA_TYPE, no static
+            // classification -- see getStaticType) has no fallback shape
+            // to drop back to, so for those the scheduled/activated
+            // checkbox alone gates existence, same as before.
             function isRecordVisible(record, type) {
+                if (!isWithinAltitudeFilter(record)) return false;
+
                 const v = typeVisibility ? typeVisibility.get(type) : null;
                 if (!v) return true;
-                return v.static;
-            }
-
-            // Whether a published record currently gets the LARA_FUA
-            // highlight style/label (as opposed to falling back to its
-            // normal/default style while still being drawn) -- driven by
-            // `scheduled`/`activated`, independent of `static`.
-            function isHighlighted(record, type) {
-                const v = typeVisibility ? typeVisibility.get(type) : null;
-                if (!isPublished(record)) return false;
-                if (!v) return isActive(record);
-                return isActive(record) ? v.activated : v.scheduled;
+                if (!isPublished(record)) return v.static;
+                const highlighted = isActive(record) ? v.activated : v.scheduled;
+                if (type === LARA_FUA_TYPE) return highlighted;
+                return v.static || highlighted;
             }
 
             // Selecting multiple types shows their union: each type's own
@@ -3783,7 +4281,14 @@
 
                 typeGroups.forEach((group, type) => {
                     const v = typeVisibility ? typeVisibility.get(type) : null;
-                    const typeEnabled = !v || v.static;
+                    // The whole group is only removed from the map when
+                    // ALL 3 boxes are off -- static gates unpublished
+                    // records within the group, scheduled/activated gate
+                    // published ones, and isRecordVisible below decides
+                    // per-record. Removing the group here on static alone
+                    // would also hide that type's scheduled/activated
+                    // records, which is exactly what we don't want.
+                    const typeEnabled = !v || v.static || v.scheduled || v.activated;
                     if (typeEnabled) {
                         if (!airspaceParentGroup.hasLayer(group)) airspaceParentGroup.addLayer(group);
                     } else {
@@ -3791,27 +4296,115 @@
                     }
                 });
 
-                // Per-record visibility comes from isRecordVisible
-                // (`static` only). The LARA_FUA label (name/time/altitude)
-                // is only shown while the record is both visible AND
-                // currently highlighted -- unpublished/P/R records are
-                // never "highlighted" by isHighlighted, so give their
-                // (permanent-style) label opacity 1 whenever visible,
-                // same as before.
+                // Per-record visibility: unpublished records gated by
+                // `static`, ADHOC (LARA_FUA-only, no static shape) records
+                // gated by `scheduled`/`activated` alone, and everything
+                // else with a real static type visible whenever EITHER
+                // `static` OR the applicable scheduled/activated box is
+                // checked (see isRecordVisible) -- so unchecking
+                // scheduled/activated alone drops the highlight and falls
+                // back to the plain static polygon instead of hiding it.
+                // Highlight vs plain-static styling is decided separately
+                // by styleForAirspace/labelHTMLFor using the same
+                // scheduled/activated flags, independent of visibility.
+                //
+                // Labels only carry LARA/FUA (or P/R permanent-altitude)
+                // information, so a label should be shown only while that
+                // information is actually being displayed on the polygon
+                // -- i.e. while highlighted -- not merely while the
+                // polygon itself is visible. A record showing as its
+                // plain static fallback (scheduled/activated unchecked,
+                // static checked) is visible but not highlighted, so its
+                // label hides along with the highlight, same as if the
+                // whole record were hidden -- P/R included: even though
+                // isPublished/isActive force them into the published
+                // branch unconditionally (see isPublished/isActive), their
+                // `activated` checkbox still gates their label the same
+                // way it does for every other type. Unchecking `activated`
+                // for P/R hides the label; the polygon itself stays
+                // visible via `static`, same as any other type falling
+                // back to its plain static appearance.
                 airspaceIndex.forEach((entry) => {
                     const visible = isRecordVisible(entry.record, entry.type);
+                    const labelVisible = visible && isHighlighted(entry.record, entry.type);
 
                     if (visible) {
                         restoreLayerVisualStyle(entry.layer, styleForAirspace(entry.record, entry.type));
-                        const labelOn = isPublished(entry.record)
-                            ? isHighlighted(entry.record, entry.type)
-                            : true;
-                        if (entry.label) entry.label.setOpacity(labelOn ? 1 : 0);
                     } else {
                         entry.layer.setStyle(HIDDEN_STYLE);
-                        if (entry.label) entry.label.setOpacity(0);
                     }
+                    if (entry.label) entry.label.setOpacity(labelVisible ? 1 : 0);
                 });
+            }
+
+            // Formats a slider value (hundreds of feet, i.e. FL) as the
+            // altitude label text used above the Floor/Ceiling sliders.
+            // 0 reads as "SFC" (surface) and the slider's top step reads
+            // as "UNL" (unlimited) to match how the airspace labels
+            // themselves already render SFC/UNL (see
+            // buildPermanentLabelHTML) -- everything in between is shown
+            // as a flight level, e.g. FL065.
+            function formatAltitudeFilterBound(ft, isTop) {
+                if (ft <= 0) return 'SFC';
+                if (isTop && ft >= ALTITUDE_FILTER_MAX_FT) return 'UNL';
+                return `FL${Math.round(ft / 100).toString().padStart(3, '0')}`;
+            }
+
+            // Wires one Floor/Ceiling dual-thumb slider: two overlapping
+            // native range inputs (low/high) plus a label div and a fill
+            // bar. Keeps the low thumb from crossing above the high thumb
+            // (and vice versa) by clamping on input, updates the fill
+            // bar's left/width to visually span the selected range, and
+            // calls onChange(low, high) -- in feet -- whenever either
+            // thumb moves, which is where the caller re-applies filters.
+            function wireDualSlider(lowId, highId, fillId, labelId, labelPrefix, onChange) {
+                const lowEl = document.getElementById(lowId);
+                const highEl = document.getElementById(highId);
+                const fillEl = document.getElementById(fillId);
+                const labelEl = document.getElementById(labelId);
+                if (!lowEl || !highEl) return;
+
+                const sliderMax = Number(lowEl.max);
+
+                function update() {
+                    let low = Number(lowEl.value);
+                    let high = Number(highEl.value);
+
+                    // Keep the two thumbs from swapping past each other --
+                    // if the user drags one thumb across the other, pin
+                    // both to the same value at the crossing point rather
+                    // than letting low > high (which would make the
+                    // filter reject everything).
+                    if (low > high) {
+                        if (document.activeElement === lowEl) {
+                            high = low;
+                            highEl.value = String(high);
+                        } else {
+                            low = high;
+                            lowEl.value = String(low);
+                        }
+                    }
+
+                    const lowPct = (low / sliderMax) * 100;
+                    const highPct = (high / sliderMax) * 100;
+                    if (fillEl) {
+                        fillEl.style.left = `${lowPct}%`;
+                        fillEl.style.width = `${Math.max(0, highPct - lowPct)}%`;
+                    }
+                    if (labelEl) {
+                        const lowText = formatAltitudeFilterBound(low * 100, false);
+                        const highText = formatAltitudeFilterBound(high * 100, true);
+                        labelEl.textContent = `${lowText} – ${highText}`;
+                    }
+
+                    // Slider units are hundreds of feet (FL-style, step 5
+                    // = 500ft); onChange wants feet.
+                    onChange(low * 100, high * 100);
+                }
+
+                lowEl.addEventListener('input', update);
+                highEl.addEventListener('input', update);
+                update();
             }
 
             function wireFilterControls() {
@@ -3828,6 +4421,36 @@
                 // longer global checkboxes -- each type (including ADHOC,
                 // i.e. LARA_FUA_TYPE) now gets its own STATIC/SCHEDULED/
                 // ACTIVATED row, wired up in renderTypeFilterUI instead.
+
+                // Floor Range / Ceiling Range dual sliders (see
+                // isWithinAltitudeFilter). Each pair of thumbs updates
+                // altitudeFilter and re-applies filters live as the user
+                // drags, same as the existing single-thumb sliders.
+                wireDualSlider(
+                    'airspace-floor-filter-low',
+                    'airspace-floor-filter-high',
+                    'airspace-floor-filter-fill',
+                    'airspace-floor-filter-val',
+                    'Floor',
+                    (low, high) => {
+                        altitudeFilter.floorMin = low;
+                        altitudeFilter.floorMax = high;
+                        applyFilters();
+                    }
+                );
+
+                wireDualSlider(
+                    'airspace-ceiling-filter-low',
+                    'airspace-ceiling-filter-high',
+                    'airspace-ceiling-filter-fill',
+                    'airspace-ceiling-filter-val',
+                    'Ceiling',
+                    (low, high) => {
+                        altitudeFilter.ceilMin = low;
+                        altitudeFilter.ceilMax = high;
+                        applyFilters();
+                    }
+                );
             }
 
             // ---- Public API -------------------------------------------------
