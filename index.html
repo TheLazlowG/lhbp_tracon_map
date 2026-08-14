@@ -1068,17 +1068,15 @@
  
         async function updateMetar() {
             const metarEl = document.getElementById('radar-metar');
-            const cacheBuster = Date.now();
-            const targetUrl = `https://aviationweather.gov/api/data/metar?ids=${METAR_STATION}&format=raw&_=${cacheBuster}`;
-            const proxiedUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
- 
+            const targetUrl = `/api/metar?ids=${encodeURIComponent(METAR_STATION)}`;
+
             try {
-                const response = await fetch(proxiedUrl, {
+                const response = await fetch(targetUrl, {
                     cache: 'no-store'
                 });
-                if (!response.ok) throw new Error('Network response not OK');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const text = (await response.text()).trim();
- 
+
                 if (text) {
                     metarEl.textContent = text;
                 } else {
