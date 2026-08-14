@@ -1074,8 +1074,7 @@
  
             try {
                 const response = await fetch(proxiedUrl, {
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' }
+                    cache: 'no-store'
                 });
                 if (!response.ok) throw new Error('Network response not OK');
                 const text = (await response.text()).trim();
@@ -2804,9 +2803,9 @@
             return res.json();
         }
 
-        // ADS-B.fi is accessed through the local Node.js proxy.
-        // The proxy avoids the browser CORS restriction and forwards the
-        // request to https://opendata.adsb.fi/api/v3/...
+        // ADS-B.fi is accessed through the Vercel serverless proxy.
+        // Keeping this as a same-origin path avoids browser CORS issues
+        // when the radar is deployed at the Vercel project URL.
         const TRAFFIC_API_BASE = '/api/aircraft';
 
         async function fetchLiveTraffic() {
