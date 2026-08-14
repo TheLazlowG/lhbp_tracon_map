@@ -2795,7 +2795,7 @@
                 });
             });
             if (targets.length === 0) throw new Error('Zero targets inside tracking sector');
-            processTrafficTargets(targets, `${targets.length} targets`, 'airplanes.live');
+            processTrafficTargets(targets, `${targets.length} targets`, 'ADS-B.fi');
         }
 
         async function fetchJson(url) {
@@ -2804,15 +2804,23 @@
             return res.json();
         }
 
+        // ADS-B.fi is accessed through the local Node.js proxy.
+        // The proxy avoids the browser CORS restriction and forwards the
+        // request to https://opendata.adsb.fi/api/v3/...
+        const TRAFFIC_API_BASE = '/api/aircraft';
+
         async function fetchLiveTraffic() {
             const [lat, lon] = RADAR_CENTER;
-            const targetUrl = `https://api.airplanes.live/v2/point/${lat}/${lon}/${RADAR_RADIUS_NM}`;
+            const targetUrl =
+                `${TRAFFIC_API_BASE}?lat=${encodeURIComponent(lat)}` +
+                `&lon=${encodeURIComponent(lon)}` +
+                `&dist=${encodeURIComponent(RADAR_RADIUS_NM)}`;
 
             try {
                 const data = await fetchJson(targetUrl);
                 processAdsbTraffic(data);
             } catch (err) {
-                console.error("airplanes.live stream connection failure:", err.message);
+                console.error("ADS-B.fi stream connection failure:", err.message);
                 setTrafficSource('failed');
             }
         }
