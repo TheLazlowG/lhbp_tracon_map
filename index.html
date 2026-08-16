@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+	<title>LHBP Radar</title>
+    <link rel="icon" href="./lhbp-radar-favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -889,44 +891,6 @@
             visibility: visible !important;
         }
 
-
-        /* iOS Safari: keep a tiny real document scroll range so the normal
-           upward swipe can collapse Safari's address/tab bars. */
-        @media (max-width: 700px) {
-            html {
-                overflow-y: auto !important;
-                overflow-x: hidden !important;
-                height: 100%;
-            }
-
-            body {
-                overflow-y: auto !important;
-                overflow-x: hidden !important;
-                min-height: calc(100dvh + 2px);
-                height: calc(100dvh + 2px);
-                -webkit-overflow-scrolling: touch;
-            }
-
-            #radar-scope {
-                width: 100vw;
-                height: 100dvh;
-                min-height: 100dvh;
-                touch-action: pan-y pinch-zoom;
-            }
-
-            .leaflet-container {
-                touch-action: pan-y pinch-zoom;
-            }
-
-            body::after {
-                content: "";
-                display: block;
-                width: 1px;
-                height: 2px;
-                pointer-events: none;
-            }
-        }
-
 </style>
 </head>
 <body>
@@ -949,9 +913,9 @@
                         <div class="radar-launch-group">
                             <button type="button" class="radar-launch-btn" data-panel="aircraft" title="Aircraft">ACFT</button>
                             <button type="button" class="radar-launch-btn" data-panel="map" title="Map">MAP</button>
-                            <button type="button" class="radar-launch-btn" data-panel="procedures" title="Procedures">PRC</button>
-                            <button type="button" class="radar-launch-btn" data-panel="weather" title="Weather">WX</button>
-                            <button type="button" class="radar-launch-btn" data-panel="airspaces" title="Airspaces">ASP</button>
+                            <button type="button" class="radar-launch-btn" data-panel="procedures" title="Procedures">PROC</button>
+                            <button type="button" class="radar-launch-btn" data-panel="weather" title="Weather">WXR</button>
+                            <button type="button" class="radar-launch-btn" data-panel="airspaces" title="Airspaces">ASPC</button>
                             <button type="button" class="radar-launch-btn" data-panel="atc" title="ATC audio">ATC</button>
             </div>
         </div>
