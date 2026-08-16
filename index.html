@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
 		<!-- :root { -->
 			<!-- --accent-color: #5DE_B3D; #5DEB3D is the current-->
@@ -70,151 +70,652 @@
             text-overflow: ellipsis;
         }
 
-        /* Tactical Control Panel Wrapper (Sliding Container) */
+        /* Modern radar settings UI */
         .radar-ui-wrapper {
             position: absolute;
-            top: 0px;
-            right: 0px;
+            top: 50%;
+            right: 16px;
+            transform: translateY(-50%);
             z-index: 1000;
             display: flex;
-            align-items: flex-start;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            transform: translateX(0); /* Fully open by default */
+            align-items: center;
+            gap: 8px;
+            font-family: 'Google Sans Code', monospace;
+            transition: none;
+        }
+        .radar-ui-toggle-btn { display: none; }
+
+        .radar-ui-launcher {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 5px;
+            background: rgba(8, 10, 9, 0.78);
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 11px;
+            box-shadow: 0 12px 35px rgba(0,0,0,.35);
+            backdrop-filter: blur(14px);
+        }
+        .radar-launch-btn {
+            width: 40px;
+            height: 36px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: transparent;
+            color: #737b76;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+        .radar-launch-btn:hover {
+            color: #e3e8e5;
+            background: rgba(255,255,255,.055);
+            border-color: rgba(255,255,255,.08);
+        }
+        .radar-launch-btn.active {
+            color: #071007;
+            background: #5DEB3D;
+            border-color: #5DEB3D;
+        }
+        .radar-launch-btn.rwy-pristine {
+            color: #071007;
+            background: #5DEB3D;
+            border-color: #5DEB3D;
+        }
+        .radar-launch-btn.rwy-pristine span { color: #071007; }
+        .radar-launch-btn.rwy-modified { color: #8b948e; }
+        .radar-launch-btn span {
+            display:block;
+            margin-top: 2px;
+            color: #737b76;
+            font-size: 8px;
         }
 
-        /* Slide panel off-screen while preserving button width */
-        .radar-ui-wrapper.collapsed {
-            transform: translateX(calc(100% - 28px));
+        .radar-ui-panel {
+            position: absolute;
+            right: 55px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 270px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            padding: 16px;
+            box-sizing: border-box;
+            background: rgba(13,16,15,.94);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 14px;
+            box-shadow: 0 18px 55px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.025);
+            backdrop-filter: blur(18px) saturate(115%);
+            color: #e2e6e3;
+            display: none;
+            animation: radarPanelIn .14s ease-out;
         }
+        .radar-ui-panel.is-open { display:block; }
+        .radar-ui-panel::-webkit-scrollbar { width: 5px; }
+        .radar-ui-panel::-webkit-scrollbar-thumb { background:#343b37; border-radius:10px; }
+        @keyframes radarPanelIn {
+            from { opacity:0; transform:translateY(-50%) translateX(6px); }
+            to { opacity:1; transform:translateY(-50%) translateX(0); }
+        }
+        .radar-panel-heading {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            height: 38px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,.09);
+            color:#dce2de;
+            font-size:10px;
+            font-weight:700;
+            letter-spacing:1px;
+            text-transform:uppercase;
+        }
+        .radar-panel-close {
+            width:26px;height:26px;
+            border:1px solid rgba(255,255,255,.10);
+            border-radius:7px;
+            background:rgba(255,255,255,.035);
+            color:#7c8580;
+            font-family:'Google Sans Code',monospace;
+            cursor:pointer;
+        }
+        .radar-panel-close:hover { color:#fff; background:rgba(255,255,255,.08); }
 
-        /* Collapsible Toggle Button pinned to Top-Left of Panel */
-        .radar-ui-toggle-btn {
-            background: rgba(8, 8, 8, 0.9);
-            border: 1px solid #8A8A8A;
-            border-right: none;
+        .radar-view-btn-row { display:flex; gap:5px; margin-bottom:10px; }
+        .radar-reset-btn {
+            flex:1;
+            width:auto;
+            min-height:34px;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.10);
+            color:#8b948e;
+            padding:6px;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            font-weight:600;
+            letter-spacing:.4px;
+            box-sizing:border-box;
+            border-radius:7px;
+            cursor:pointer;
+            margin-bottom:0;
+        }
+        .radar-reset-btn:hover { color:#fff; background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.18); }
+        .radar-reset-btn:active { color:#5DEB3D; border-color:#5DEB3D; }
+
+        .radar-search-container { margin-bottom: 10px; }
+        .radar-search-input {
+            width:100%; height:34px;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.10);
+            color:#e7ebe8;
+            padding:0 10px;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            box-sizing:border-box;
+            border-radius:8px;
+        }
+        .radar-search-input::placeholder { color:#555e59; }
+        .radar-search-input:focus {
+            outline:none;
+            border-color:rgba(103,232,90,.42);
+            box-shadow:0 0 0 3px rgba(103,232,90,.06);
+        }
+        .radar-ui-title {
+            font-size:10px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            color:#dce2de;
+            margin:0 0 10px;
+            padding-bottom:10px;
+            border-bottom:1px solid rgba(255,255,255,.09);
+        }
+        .radar-ui-section {
+            font-size:8px;
+            color:#59625d;
+            text-transform:uppercase;
+            letter-spacing:.7px;
+            margin:13px 8px 4px;
+        }
+        .radar-ui-control {
+            display:flex;
+            align-items:center;
+            min-height:34px;
+            margin:0;
+            padding:2px 8px;
+            border-radius:7px;
+            color:#aaa;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            cursor:pointer;
+            transition:.12s ease;
+        }
+        .radar-ui-control:hover { color:#fff; background:rgba(255,255,255,.035); }
+        .radar-ui-control input[type="checkbox"] {
+            width:13px;
+            height:13px;
+            margin:0 9px 0 0;
+            cursor:pointer;
+        }
+        .radar-slider-container {
+            margin:4px 0;
+            padding:9px 8px 10px;
+            border-radius:8px;
+            background:rgba(255,255,255,.025);
+        }
+        .radar-slider-output {
+            font-size:11px;
+            font-weight:700;
+            color:#5DEB3D;
+            margin-bottom:4px;
+        }
+        .radar-ui-slider { width:100%; margin:0; accent-color:#5DEB3D; cursor:pointer; }
+
+        .radar-atc-links { display:flex; flex-direction:column; gap:5px; }
+        .radar-atc-link {
+            min-height:34px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:0 9px;
+            box-sizing:border-box;
+            border:1px solid rgba(255,255,255,.075);
+            border-radius:7px;
+            background:rgba(255,255,255,.025);
+            color:#999;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            text-decoration:none;
+        }
+        .radar-atc-link:hover { border-color:rgba(103,232,90,.28); background:rgba(103,232,90,.045); color:#fff; }
+        .radar-atc-link-all { color:#5DEB3D; border-color:rgba(103,232,90,.24); background:rgba(103,232,90,.08); }
+
+        .airspace-legend { display:flex; justify-content:space-between; margin:8px 0 5px; padding:7px 8px; border-radius:7px; background:rgba(255,255,255,.025); color:#59625d; font-size:7px; letter-spacing:.4px; }
+        .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
+        .status-dot.static { background:#aaa; }
+        .status-dot.scheduled { background:#ffc107; }
+        .status-dot.activated { background:#ff3b30; }
+        .airspace-type-header .airspace-type-header-check:nth-child(1) { color:#aaa; }
+        .airspace-type-header .airspace-type-header-check:nth-child(2) { color:#ffc107; }
+        .airspace-type-header .airspace-type-header-check:nth-child(3) { color:#ff3b30; }
+        .airspace-type-row .airspace-type-checks input[type="checkbox"] { width:16px; margin:0; cursor:pointer; }
+        .airspace-type-row .airspace-type-checks input[type="checkbox"]:nth-child(1) { accent-color:#aaa; }
+        .airspace-type-row .airspace-type-checks input[type="checkbox"]:nth-child(2) { accent-color:#ffc107; }
+        .airspace-type-row .airspace-type-checks input[type="checkbox"]:nth-child(3) { accent-color:#ff3b30; }
+        .airspace-type-row .airspace-type-name { font-size:10px; color:#aaa; }
+
+        .radar-dual-slider-fill { background:#5DEB3D; }
+        /* ATC Target Label (Datablock) */
+        .atc-label {
             color: #5DEB3D;
             font-family: 'Google Sans Code', monospace;
             font-size: 12px;
-            font-weight: bold;
-            width: 28px;
-            height: 32px;
-            line-height: 30px;
-            text-align: center;
-            cursor: pointer;
-            user-select: none;
-            border-radius: 2px 0 0 2px;
-            box-shadow: -2px 4px 8px rgba(0, 0, 0, 0.5);
-            margin-top: 10px;
-        }
-        .radar-ui-toggle-btn:hover {
-            color: #ffffff;
-            background: rgba(20, 20, 20, 0.95);
+            font-weight: normal;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            line-height: 1.1;
+            white-space: nowrap;
         }
 
-        /* Reset View Button */
-        .radar-view-btn-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-        .radar-reset-btn {
-            flex: 1;
-            width: auto;
-            background: #141414;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            color: #8A8A8A;
-            padding: 6px;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 11px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            box-sizing: border-box;
-            border-radius: 2px;
-            cursor: pointer;
-            margin-bottom: 0;
-        }
-        .radar-reset-btn:hover {
-            color: #ffffff;
-            border-color: #ffffff;
-            background: rgba(20, 20, 20, 0.95);
-        }
-        .radar-reset-btn:active {
-            color: #5DEB3D;
-            border-color: #5DEB3D;
+        /* Clean containers for custom markers */
+        .wp-triangle-icon {
+            background: transparent !important;
+            border: none !important;
         }
 
-        /* RWY DIR button only: stacked two-line label (RWY DIR / <dir>)
-           so the direction number reads bigger than the shared 11px
-           .radar-reset-btn text -- other .radar-reset-btn buttons are
-           untouched since this only applies with the extra class. */
-        .radar-reset-btn.radar-reset-btn-2line {
-            line-height: 1.3;
-            padding-top: 4px;
-            padding-bottom: 4px;
+        /* Strip out all tooltip pointer arrows/triangles completely */
+        .leaflet-tooltip {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
         }
-        .radar-reset-btn-2line .radar-reset-btn-line1 {
-            display: block;
-            font-size: 11px;
-            opacity: 0.8;
-        }
-        .radar-reset-btn-2line .radar-reset-btn-line2 {
-            display: block;
-            font-size: 15px;
-        }
-
-        /* Tactical Control Panel UI */
-        .radar-ui-panel {
-            background: rgba(8, 8, 8, 0.9);
-            border: 1px solid #8A8A8A;
-            padding: 12px 16px;
-            font-family: 'Google Sans Code', monospace;
-            color: #8A8A8A;
-            border-radius: 0 0 0 2px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            max-height: 95vh;
-            overflow-y: auto;
-            width: 200px;
-            box-sizing: content-box;
-        }
-        .radar-ui-title {
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 4px;
+        .leaflet-tooltip:before {
+            display: none !important;
         }
         
-        /* Search Bar Engine Styles */
-        .radar-search-container {
-            margin-bottom: 14px;
-        }
-        .radar-search-input {
-            width: 100%;
-            background: #141414;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            color: #ffffff;
-            padding: 6px;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 11px;
+        /* ATC Target Square */
+        .atc-target-icon {
+            background: transparent;
+            border: 2.2px solid #5DEB3D;
+            border-radius: 50%;
+            width: 7px;
+            height: 7px;
+            transform: translate(-50%, -50%);
             box-sizing: border-box;
-            border-radius: 2px;
         }
-        .radar-search-input:focus {
-            outline: none;
-            border-color: #FFFF00;
-            box-shadow: 0 0 4px rgba(255, 255, 0, 0.2);
+        .atc-target-icon.selected {
+            box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
+        }
+        /* MLAT-sourced aircraft are shown as a rectangle instead of a
+           circle, so the position source is distinguishable at a glance. */
+        .atc-target-icon.mlat {
+            width: 6px;
+            height: 6px;
+            border-radius: 1px;
+        }
+            /* Separate sidebar groups: view presets, runway toggle, settings */
+        .radar-ui-launcher {
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            backdrop-filter: none;
+            gap: 7px;
+        }
+        .radar-launch-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 5px;
+            background: rgba(8, 10, 9, 0.78);
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 11px;
+            box-shadow: 0 12px 35px rgba(0,0,0,.35);
+            backdrop-filter: blur(14px);
         }
 
-        .radar-ui-section {
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 10px 0 4px 0;
+        /* Dual-thumb altitude filters — preserved from the original radar UI */
+        .radar-dual-slider {
+            position:relative;
+            height:18px;
+            margin:2px 0 4px;
         }
+        .radar-dual-slider-track {
+            position:absolute;
+            left:0;right:0;top:50%;
+            height:3px;
+            transform:translateY(-50%);
+            background:#333;
+            border-radius:2px;
+        }
+        .radar-dual-slider-fill {
+            position:absolute;
+            top:50%;
+            height:3px;
+            transform:translateY(-50%);
+            background:#5DEB3D;
+            border-radius:2px;
+        }
+        .radar-dual-slider input[type="range"] {
+            position:absolute;
+            left:0;right:0;top:0;
+            width:100%;
+            height:18px;
+            margin:0;
+            background:transparent;
+            pointer-events:none;
+            -webkit-appearance:none;
+            appearance:none;
+        }
+        .radar-dual-slider input[type="range"]::-webkit-slider-runnable-track {
+            background:transparent;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-track {
+            background:transparent;
+        }
+        .radar-dual-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            appearance:none;
+            pointer-events:auto;
+            width:12px;height:12px;
+            border-radius:50%;
+            background:#fff;
+            border:1px solid #5DEB3D;
+            cursor:pointer;
+            margin-top:-4.5px;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-thumb {
+            pointer-events:auto;
+            width:12px;height:12px;
+            border-radius:50%;
+            background:#fff;
+            border:1px solid #5DEB3D;
+            cursor:pointer;
+            box-sizing:border-box;
+        }
+
+
+        /* Sidebar typography refinement */
+        .radar-launch-btn {
+            font-size: 11px !important;
+        }
+        .radar-launch-btn span {
+            font-size: 9px !important;
+        }
+        .radar-panel-heading {
+            font-size: 12px !important;
+        }
+        .radar-ui-panel,
+        .radar-ui-panel label,
+        .radar-ui-panel button,
+        .radar-ui-panel input,
+        .radar-ui-section,
+        .radar-slider-output {
+            font-size: 11px;
+        }
+
+        /* View presets and runway are selectors, not status indicators:
+           keep them neutral rather than using the green accent. */
+        .radar-launch-btn[data-view-preset].active {
+            color: #d0d5d2 !important;
+            background: rgba(255,255,255,.055) !important;
+            border-color: rgba(255,255,255,.14) !important;
+        }
+        #rwy-direction-btn,
+        #rwy-direction-btn.rwy-pristine,
+        #rwy-direction-btn.modified {
+            color: #b8c0bb !important;
+            background: rgba(255,255,255,.035) !important;
+            border-color: rgba(255,255,255,.10) !important;
+        }
+        #rwy-direction-btn span {
+            color: #8c9690 !important;
+        }
+
+
+        /* Explicit ON/OFF controls replace ordinary checkboxes */
+        .radar-onoff-control {
+            width:100%;
+            min-height:34px;
+            margin:2px 0;
+            padding:0 8px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:7px;
+            background:rgba(255,255,255,.025);
+            color:#aeb6b1;
+            font:500 11px 'Google Sans Code', monospace;
+            text-align:left;
+            cursor:pointer;
+            transition:.14s ease;
+        }
+        .radar-onoff-control:hover {
+            color:#e4e9e5;
+            background:rgba(255,255,255,.05);
+            border-color:rgba(255,255,255,.15);
+        }
+        .radar-onoff-control .onoff-state {
+            min-width:31px;
+            padding:3px 5px;
+            border-radius:4px;
+            text-align:center;
+            font-size:9px;
+            font-weight:700;
+            letter-spacing:.4px;
+        }
+        .radar-onoff-control .onoff-state.ON {
+            color:#67e85a;
+            background:rgba(103,232,90,.10);
+            border:1px solid rgba(103,232,90,.22);
+        }
+        .radar-onoff-control .onoff-state.OFF {
+            color:#68716c;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.08);
+        }
+        .radar-hidden-checkbox {
+            position:absolute !important;
+            opacity:0 !important;
+            pointer-events:none !important;
+            width:1px !important;
+            height:1px !important;
+        }
+
+
+        /* View presets and runway direction are neutral controls.
+           They should never use the green active-state treatment. */
+        .radar-launch-btn[data-view-preset],
+        .radar-launch-btn[data-view-preset].active,
+        #rwy-direction-btn,
+        #rwy-direction-btn.active,
+        #rwy-direction-btn.rwy-pristine,
+        #rwy-direction-btn.modified {
+            color:#b8c0bb !important;
+            background:rgba(255,255,255,.035) !important;
+            border-color:rgba(255,255,255,.10) !important;
+            box-shadow:none !important;
+        }
+        .radar-launch-btn[data-view-preset]:hover,
+        #rwy-direction-btn:hover {
+            color:#e2e7e4 !important;
+            background:rgba(255,255,255,.07) !important;
+            border-color:rgba(255,255,255,.18) !important;
+        }
+        #rwy-direction-btn span {
+            color:#8c9690 !important;
+        }
+
+
+        /* Runway toggle: neutral at rest, brief tactile feedback on click */
+        #rwy-direction-btn,
+        #rwy-direction-btn.rwy-pristine,
+        #rwy-direction-btn.modified,
+        #rwy-direction-btn.active {
+            color:#b8c0bb !important;
+            background:rgba(255,255,255,.035) !important;
+            border-color:rgba(255,255,255,.10) !important;
+            box-shadow:none !important;
+            transform:none !important;
+        }
+        #rwy-direction-btn.rwy-clicked {
+            color:#e8eee9 !important;
+            background:rgba(255,255,255,.12) !important;
+            border-color:rgba(255,255,255,.26) !important;
+            box-shadow:0 0 0 2px rgba(255,255,255,.035) !important;
+            transform:scale(.96) !important;
+            transition:none !important;
+        }
+        #rwy-direction-btn span {
+            color:#8c9690 !important;
+        }
+
+
+        /* FINAL RUNWAY OVERRIDE
+           Runway direction is a neutral toggle; only click feedback may brighten it. */
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn,
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.rwy-pristine,
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.modified,
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.active {
+            background: rgba(255,255,255,.035) !important;
+            background-color: rgba(255,255,255,.035) !important;
+            color: #b8c0bb !important;
+            border: 1px solid rgba(255,255,255,.10) !important;
+            border-color: rgba(255,255,255,.10) !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn:hover {
+            background: rgba(255,255,255,.07) !important;
+            background-color: rgba(255,255,255,.07) !important;
+            color: #e2e7e4 !important;
+            border-color: rgba(255,255,255,.18) !important;
+        }
+
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.rwy-clicked {
+            background: rgba(255,255,255,.12) !important;
+            background-color: rgba(255,255,255,.12) !important;
+            color: #f0f4f1 !important;
+            border-color: rgba(255,255,255,.26) !important;
+        }
+
+        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn span {
+            color: #8c9690 !important;
+        }
+
+
+        /* Airspace status matrix: TYPE | Static | Scheduled | Active */
+        .airspace-type-header,
+        .airspace-type-row {
+            display:grid;
+            grid-template-columns:minmax(0,1fr) 22px 22px 22px;
+            align-items:center;
+            column-gap:4px;
+        }
+        .airspace-type-header {
+            margin:10px 0 4px;
+            padding:0 5px;
+            color:#59615c;
+            font-size:8px;
+            letter-spacing:.5px;
+        }
+        .airspace-type-header-check { text-align:center; font-weight:700; }
+        .airspace-type-header-check.static-h { color:#aaa; }
+        .airspace-type-header-check.scheduled-h { color:#ffc107; }
+        .airspace-type-header-check.activated-h { color:#ff3b30; }
+        .airspace-type-row {
+            min-height:28px;
+            padding:2px 5px;
+            border-radius:6px;
+        }
+        .airspace-type-row:hover { background:rgba(255,255,255,.035); }
+        .airspace-type-name { color:#aeb6b1; font-size:10px; min-width:0; }
+        .airspace-matrix-check {
+            appearance:none;
+            -webkit-appearance:none;
+            width:15px !important;
+            height:15px;
+            margin:0 !important;
+            justify-self:center;
+            border:1px solid #4b514e;
+            border-radius:4px;
+            background:#151817;
+            cursor:pointer;
+            position:relative;
+        }
+        .airspace-matrix-check:checked::after {
+            content:'✓';
+            position:absolute;
+            inset:0;
+            display:grid;
+            place-items:center;
+            font-size:10px;
+            font-weight:700;
+        }
+        .airspace-matrix-check.static-cell:checked { border-color:#aaa; background:rgba(170,170,170,.12); color:#aaa; }
+        .airspace-matrix-check.scheduled-cell:checked { border-color:#ffc107; background:rgba(255,193,7,.12); color:#ffc107; }
+        .airspace-matrix-check.activated-cell:checked { border-color:#ff3b30; background:rgba(255,59,48,.12); color:#ff3b30; }
+        .radar-search-group { margin-bottom: 0; }
+        .radar-search-launch { font-size: 10px !important; letter-spacing: .4px; }
+        .radar-panel-note {
+            margin-top: 10px;
+            padding: 9px 10px;
+            border-radius: 7px;
+            background: rgba(255,255,255,.025);
+            color: #59615c;
+            font-size: 9px;
+            line-height: 1.45;
+        }
+
+        /* Visual refinement: flatter, more utilitarian radar-console styling */
+        .radar-launch-group {
+            border-radius: 0 !important;
+            box-shadow: 0 8px 24px rgba(0,0,0,.28) !important;
+        }
+        .radar-launch-btn {
+            border-radius: 0 !important;
+        }
+        .radar-ui-panel {
+            border-radius: 0 !important;
+            box-shadow: -8px 10px 30px rgba(0,0,0,.40) !important;
+        }
+        .radar-panel-close {
+            border-radius: 0 !important;
+        }
+        .radar-onoff-control {
+            border-radius: 0 !important;
+        }
+        .radar-onoff-control .onoff-state {
+            border-radius: 0 !important;
+        }
+        .radar-search-input,
+        .radar-search-container input {
+            border-radius: 0 !important;
+        }
+        .radar-slider-row,
+        .radar-ui-section-card,
+        .radar-radio-row,
+        .radar-panel-note {
+            border-radius: 0 !important;
+        }
+        .radar-airspace-matrix,
+        .radar-airspace-matrix .matrix-cell,
+        .radar-airspace-matrix .matrix-head {
+            border-radius: 0 !important;
+        }
+
+
+        /* Map label styling — kept identical to the working radar version */
         .taxiway-label {
             color: rgba(255, 255, 255, 0.65);
             font-size: 12px;
@@ -329,206 +830,16 @@
             padding-top: 1px;
         }
 
-        .radar-ui-control {
-            display: flex;
-            align-items: center;
-            margin: 4px 0;
-            font-size: 11px;
-            cursor: pointer;
-            user-select: none;
-        }
-        .radar-ui-control input[type="checkbox"] {
-            margin: 0 8px 0 0;
-            cursor: pointer;
-            accent-color: #ffffff;
-        }
 
-        /* Per-airspace-type visibility row: 3 checkboxes (static,
-           scheduled, activated) tight together, then the type name, all
-           on one line. A single header row above the list gives the 3
-           columns their (short) labels once instead of repeating a label
-           per checkbox per row. */
-        .airspace-type-header {
-            display: flex;
-            align-items: center;
-            margin: 8px 0 4px 0;
-            font-size: 8px;
-            color: rgba(255, 255, 255, 0.45);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        .leaflet-tooltip {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
         }
-        .airspace-type-header .airspace-type-header-checks {
-            display: flex;
-            gap: 2px;
-            width: 54px;
-            flex-shrink: 0;
+        .leaflet-tooltip:before {
+            display: none !important;
         }
-        .airspace-type-header .airspace-type-header-check {
-            width: 16px;
-            text-align: center;
-        }
-        .airspace-type-row {
-            display: flex;
-            align-items: center;
-            margin: 3px 0;
-        }
-        .airspace-type-row .airspace-type-checks {
-            display: flex;
-            gap: 2px;
-            width: 54px;
-            flex-shrink: 0;
-        }
-        .airspace-type-row .airspace-type-checks input[type="checkbox"] {
-            width: 16px;
-            margin: 0;
-            cursor: pointer;
-            accent-color: #ffffff;
-        }
-        .airspace-type-row .airspace-type-name {
-            font-size: 11px;
-            color: #ffffff;
-        }
-        }
-
-        /* Altitude Filter Slider Controls */
-        .radar-slider-container {
-            margin: 8px 0 4px 0;
-            padding: 4px 0;
-        }
-        .radar-slider-output {
-            font-size: 11px;
-            font-weight: bold;
-            color: #5DEB3D;
-            margin-bottom: 4px;
-        }
-        .radar-ui-slider {
-            width: 100%;
-            margin: 0;
-            accent-color: #ffffff;
-            cursor: pointer;
-            background: #222;
-        }
-
-        /* Dual-thumb range slider (airspace floor/ceiling filters).
-           Two native <input type="range"> elements are stacked in the
-           same track: both share identical min/max/step and sit
-           absolutely positioned on top of one another so their thumbs
-           share one visual track, while a colored fill div behind them
-           shows the currently-selected [low, high] span. Each input's
-           own track is made transparent so only its thumb is visible,
-           and pointer-events are limited to the thumb itself (the
-           standard trick for two overlapping native range inputs so
-           both remain independently draggable). */
-        .radar-dual-slider {
-            position: relative;
-            height: 18px;
-            margin: 2px 0 4px 0;
-        }
-        .radar-dual-slider-track {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 50%;
-            height: 3px;
-            transform: translateY(-50%);
-            background: #333;
-            border-radius: 2px;
-        }
-        .radar-dual-slider-fill {
-            position: absolute;
-            top: 50%;
-            height: 3px;
-            transform: translateY(-50%);
-            background: #5DEB3D;
-            border-radius: 2px;
-        }
-        .radar-dual-slider input[type="range"] {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 0;
-            width: 100%;
-            height: 18px;
-            margin: 0;
-            background: transparent;
-            pointer-events: none;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-        .radar-dual-slider input[type="range"]::-webkit-slider-runnable-track {
-            background: transparent;
-        }
-        .radar-dual-slider input[type="range"]::-moz-range-track {
-            background: transparent;
-        }
-        .radar-dual-slider input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            pointer-events: auto;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ffffff;
-            border: 1px solid #5DEB3D;
-            cursor: pointer;
-            margin-top: -4.5px;
-        }
-        .radar-dual-slider input[type="range"]::-moz-range-thumb {
-            pointer-events: auto;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ffffff;
-            border: 1px solid #5DEB3D;
-            cursor: pointer;
-            box-sizing: border-box;
-        }
-        .radar-dual-slider-labels {
-            display: flex;
-            justify-content: space-between;
-        }
-
-        /* ATC Radio Frequency Link List */
-        .radar-atc-links {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .radar-atc-link {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #141414;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            color: #8A8A8A;
-            padding: 6px 8px;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 10.5px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            text-decoration: none;
-            border-radius: 2px;
-            transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-        }
-        .radar-atc-link:before {
-            content: "\25B8";
-            color: #5DEB3D;
-            margin-right: 6px;
-        }
-        .radar-atc-link:hover {
-            color: #ffffff;
-            border-color: #5DEB3D;
-            background: rgba(93, 235, 61, 0.08);
-        }
-        .radar-atc-link-all {
-            color: #5DEB3D;
-            border-color: rgba(93, 235, 61, 0.4);
-            margin-top: 2px;
-        }
-        .radar-atc-link-all:before {
-            content: "";
-            margin-right: 0;
-        }
+        
 
         /* Waypoint Alphanumeric Text Styling */
         .fix-label {
@@ -541,333 +852,154 @@
             border: none;
         }
 
-        /* ---------- Label editor mode (dev-only, see EDITOR_MODE) ---------- */
-        .editable-label-icon {
-            background: transparent !important;
-            border: none !important;
-        }
-        .editable-label-base {
-            display: inline-block;
-            position: relative;
-        }
-        .editable-label-text {
-            display: inline-block;
-            color: #8A8A8A;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 11px;
-            font-weight: normal;
-            white-space: nowrap;
-            cursor: grab;
-            /* Padding + border exactly mirror Leaflet's default
-               .leaflet-tooltip box (padding: 6px; border: 1px solid),
-               which the public map only strips the color/background/
-               shadow from -- not the box-model contribution. Since the
-               real tooltip's direction:'top' placement subtracts its
-               FULL rendered height (offsetHeight, padding+border
-               included) to find its top edge, matching that box model
-               here is what keeps the editor's default label position
-               lined up with the real tooltip's. Don't shrink this
-               padding/border without also expecting the default
-               position to drift. */
-            padding: 6px;
-            border-radius: 3px;
-            border: 1px solid transparent;
-            box-sizing: content-box;
-            user-select: none;
-        }
-        .editable-label-text:active { cursor: grabbing; }
-        .editable-label-text.is-selected {
-            color: #ffffff;
-            border-color: #FFFF00;
-            background: rgba(255, 255, 0, 0.10);
-        }
-        .editable-label-text.is-dirty:not(.is-selected) {
-            color: #FFFF00;
-        }
-        .editable-label-text.is-dragging {
-            color: #ffffff;
-            border-color: #5DEB3D;
-            background: rgba(93, 235, 61, 0.15);
-        }
-        .editor-select-box {
-            position: absolute;
-            border: 1px dashed #5DEB3D;
-            background: rgba(93, 235, 61, 0.08);
-            pointer-events: none;
-            z-index: 2000;
-        }
-        .editor-hud {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2000;
-            background: rgba(8, 8, 8, 0.92);
-            border: 1px solid #8A8A8A;
-            border-radius: 3px;
-            padding: 8px 14px;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 11px;
-            color: #8A8A8A;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-            pointer-events: auto;
-        }
-        .editor-hud .hud-title {
-            color: #FFFF00;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-        }
-        .editor-hud .hud-count .n { color: #5DEB3D; font-weight: bold; }
-        .editor-hud .hud-offset .n { color: #ffffff; font-weight: bold; }
-        .editor-hud .hud-hint { color: #555; }
-        .editor-hud .hud-btn {
-            background: #141414;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            color: #8A8A8A;
-            padding: 4px 10px;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 10px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            border-radius: 2px;
-            cursor: pointer;
-        }
-        .editor-hud .hud-btn:hover {
-            color: #ffffff;
-            border-color: #ffffff;
-        }
-        .editor-hud .hud-btn:disabled {
-            opacity: 0.35;
-            cursor: default;
-            pointer-events: none;
-        }
-        .editor-hud .hud-btn.save-btn { color: #5DEB3D; border-color: rgba(93, 235, 61, 0.5); }
-        .editor-hud .hud-btn.save-btn:hover { border-color: #5DEB3D; }
 
-        /* ATC Target Label (Datablock) */
-        .atc-label {
-            color: #5DEB3D;
+
+        /* Source/update information now belongs to its relevant settings panel */
+        .radar-source-panel-status {
+            margin: -2px 0 10px;
+            padding: 7px 8px;
+            border-bottom: 1px solid rgba(255,255,255,.07);
+            color: #68716c;
             font-family: 'Google Sans Code', monospace;
-            font-size: 12px;
-            font-weight: normal;
-            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            line-height: 1.1;
-            white-space: nowrap;
+            font-size: 9px;
+            line-height: 1.45;
+            letter-spacing: .15px;
         }
 
-        /* Clean containers for custom markers */
-        .wp-triangle-icon {
-            background: transparent !important;
-            border: none !important;
+
+        /* Panel source/status information lives at the bottom */
+        .radar-source-panel-status {
+            margin: 12px 0 0;
+            padding: 8px 0 0;
+            border-top: 1px solid rgba(255,255,255,.07);
+            border-bottom: 0;
+            color: #68716c;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 9px;
+            line-height: 1.45;
+            letter-spacing: .15px;
         }
 
-        /* Strip out all tooltip pointer arrows/triangles completely */
-        .leaflet-tooltip {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
+
+        /* Radar opacity is a persistent Weather-panel control */
+        #rain-opacity-container,
+        #radar-rain-opacity-container,
+        .rain-opacity-container {
+            display: block !important;
+            visibility: visible !important;
         }
-        .leaflet-tooltip:before {
-            display: none !important;
-        }
-        
-        /* ATC Target Square */
-        .atc-target-icon {
-            background: transparent;
-            border: 2.2px solid #5DEB3D;
-            border-radius: 50%;
-            width: 7px;
-            height: 7px;
-            transform: translate(-50%, -50%);
-            box-sizing: border-box;
-        }
-        .atc-target-icon.selected {
-            box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
-        }
-        /* MLAT-sourced aircraft are shown as a rectangle instead of a
-           circle, so the position source is distinguishable at a glance. */
-        .atc-target-icon.mlat {
-            width: 6px;
-            height: 6px;
-            border-radius: 1px;
-        }
-    </style>
+
+</style>
 </head>
 <body>
     <div id="radar-clock" class="radar-clock-panel">00.00.0000 00:00:00Z</div>
     <div id="radar-metar" class="radar-metar-panel">METAR LHBP: LOADING...</div>
-    <div id="radar-airspace-status" class="radar-source-status-panel">Airspaces by PilotNet.hu<br>Last update: --:--:--Z<br>Next update: --:--:--Z</div>
-    <div id="radar-rain-status" class="radar-source-status-panel">Weather radar by Rainviewer<br>Last update: --:--:--Z<br>Next update: --:--:--Z</div>
-    <div id="radar-metar-status" class="radar-source-status-panel">METAR by aviationweather.gov<br>Last update: --:--:--Z<br>Next update: --:--:--Z</div>
 
     <div class="radar-ui-wrapper" id="radar-ui-wrapper">
-        <div class="radar-ui-toggle-btn" id="radar-ui-toggle">&gt;</div>
-        <div class="radar-ui-panel">
-            <div class="radar-view-btn-row">
-                <button type="button" id="app-view-btn" class="radar-reset-btn">APP View</button>
-                <button type="button" id="twr-view-btn" class="radar-reset-btn">TWR View</button>
-                <button type="button" id="gnd-view-btn" class="radar-reset-btn">GND View</button>
+        <div class="radar-ui-launcher" id="radar-ui-launcher">
+            <div class="radar-launch-group">
+                <button type="button" class="radar-launch-btn active" data-view-preset="APP" title="Approach view">APP</button>
+                            <button type="button" class="radar-launch-btn" data-view-preset="TWR" title="Tower view">TWR</button>
+                            <button type="button" class="radar-launch-btn" data-view-preset="GND" title="Ground view">GND</button>
             </div>
-            <div class="radar-view-btn-row">
-                <button type="button" id="rwy-direction-btn" class="radar-reset-btn radar-reset-btn-2line"><span class="radar-reset-btn-line1">RWY DIR</span><span class="radar-reset-btn-line2">31</span></button>
+            <div class="radar-launch-group">
+                            <button type="button" class="radar-launch-btn rwy-pristine" id="rwy-direction-btn" title="Toggle runway direction">RWY<span>31</span></button>
             </div>
+            <div class="radar-launch-group radar-search-group">
+                            <button type="button" class="radar-launch-btn radar-search-launch" id="radar-search-launch" data-panel="search" title="Search">SEARCH</button>
+                        </div>
+                        <div class="radar-launch-group">
+                            <button type="button" class="radar-launch-btn" data-panel="aircraft" title="Aircraft">ACFT</button>
+                            <button type="button" class="radar-launch-btn" data-panel="map" title="Map">MAP</button>
+                            <button type="button" class="radar-launch-btn" data-panel="procedures" title="Procedures">PRC</button>
+                            <button type="button" class="radar-launch-btn" data-panel="weather" title="Weather">WX</button>
+                            <button type="button" class="radar-launch-btn" data-panel="airspaces" title="Airspaces">ASP</button>
+                            <button type="button" class="radar-launch-btn" data-panel="atc" title="ATC audio">ATC</button>
+            </div>
+        </div>
 
-            <div class="radar-ui-title">Radar Search</div>
+        <div class="radar-ui-panel" data-panel-view="search">
+            <div class="radar-panel-heading"><span>SEARCH</span><button type="button" class="radar-panel-close">×</button></div>
             <div class="radar-search-container">
                 <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
             </div>
+            <div class="radar-panel-note">Search aircraft, fixes and map objects.</div>
+        </div>
 
-            <div class="radar-ui-title">Scope Display</div>
-            
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-traffic" checked> AIR TRAFFIC
-            </label>
-            
-            <label class="radar-ui-control">
-                <input type="checkbox" id="show-ground-traffic"> SHOW GROUND ACFT
-            </label>
-            
-            <label class="radar-ui-control">
-                <input type="checkbox" id="callsign-format-long" checked> TELEPHONY CALLSIGNS
-            </label>
-            
-            <div class="radar-slider-container">
-                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Max Altitude</div>
-                <div class="radar-slider-output" id="alt-filter-val">FL250</div>
-                <input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250">
-            </div>
+        <div class="radar-ui-panel" data-panel-view="aircraft">
+            <div class="radar-panel-heading"><span>AIRCRAFT</span><button type="button" class="radar-panel-close">×</button></div>
+            <div class="radar-ui-section">Traffic Display</div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-traffic"><span>AIR TRAFFIC</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-traffic" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="show-ground-traffic"><span>GROUND AIRCRAFT</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="show-ground-traffic" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="callsign-format-long"><span>TELEPHONY CALLSIGNS</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="callsign-format-long" class="radar-hidden-checkbox" checked>
+            <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">MAX ALTITUDE</div><div class="radar-slider-output" id="alt-filter-val">FL250</div><input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250"></div>
+            <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">PREDICTION LINE</div><div class="radar-slider-output" id="predict-len-val">0.25 MIN</div><input type="range" id="predict-len-slider" class="radar-ui-slider" min="0.0" max="5" step="0.25" value="0.25"></div>
+            <div class="radar-ui-section">Data Sources</div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="src-mlat"><span>MLAT</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="src-mlat" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="src-other"><span>ADS-B</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="src-other" class="radar-hidden-checkbox" checked>
+        </div>
 
-            <div class="radar-slider-container">
-                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Prediction Line</div>
-                <div class="radar-slider-output" id="predict-len-val">0.25 MIN</div>
-                <input type="range" id="predict-len-slider" class="radar-ui-slider" min="0.0" max="5" step="0.25" value="0.25">
-            </div>
-
-            <div class="radar-ui-section">ACFT Data Source</div>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="src-mlat"> MLAT
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="src-other" checked> ADS-B
-            </label>
-            
-            <div class="radar-ui-section">Map options</div>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="map-labels"> MAP LABELS
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-waypoints" checked> WAYPOINTS (FIX)
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="strip-bp-prefix" checked> STRIP "BP" PREFIX
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="filter-waypoints-8xx"> FILTER RWY 31 WAYPOINTS
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="filter-waypoints-7xx" checked> FILTER RWY 13 WAYPOINTS
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-extensions-13"> RWY 13 EXTENSION
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-extensions-31" checked> RWY 31 EXTENSION
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-ground-features"> GROUND FEATURES
-            </label>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-stands"> STANDS
-            </label>
+        <div class="radar-ui-panel" data-panel-view="map">
+            <div class="radar-panel-heading"><span>MAP</span><button type="button" class="radar-panel-close">×</button></div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="map-labels"><span>MAP LABELS</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="map-labels" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-waypoints"><span>WAYPOINTS (FIX)</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-waypoints" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="strip-bp-prefix"><span>STRIP "BP" PREFIX</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="strip-bp-prefix" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="filter-waypoints-8xx"><span>FILTER RWY 31 WAYPOINTS</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="filter-waypoints-8xx" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="filter-waypoints-7xx"><span>FILTER RWY 13 WAYPOINTS</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="filter-waypoints-7xx" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-extensions-13"><span>RWY 13 EXTENSION</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-extensions-13" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-extensions-31"><span>RWY 31 EXTENSION</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-extensions-31" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-ground-features"><span>GROUND FEATURES</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-ground-features" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-stands"><span>STANDS</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-stands" class="radar-hidden-checkbox">
             <input type="checkbox" id="multi-select-tracks" checked style="display:none;">
-			
-            <div class="radar-ui-section">Procedures</div>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid13"> SID 13
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-sid31" checked> SID 31
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-star13"> STAR 13
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-star31" checked> STAR 31
-            </label>
-			<label class="radar-ui-control">
-                <input type="checkbox" id="layer-holding"> HOLDING PATTERNS
-            </label>
+        </div>
 
-            <div class="radar-ui-section">Weather</div>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-rain"> PRECIP RADAR
-            </label>
-            <div class="radar-slider-container" id="rain-opacity-container" style="display:none;">
-                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Radar Opacity</div>
-                <div class="radar-slider-output" id="rain-opacity-val">70%</div>
-                <input type="range" id="rain-opacity-slider" class="radar-ui-slider" min="10" max="100" step="10" value="70">
+        <div class="radar-ui-panel" data-panel-view="procedures">
+            <div class="radar-panel-heading"><span>PROCEDURES</span><button type="button" class="radar-panel-close">×</button></div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-sid13"><span>SID 13</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-sid13" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-sid31"><span>SID 31</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-sid31" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-star13"><span>STAR 13</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-star13" class="radar-hidden-checkbox">
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-star31"><span>STAR 31</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-star31" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-holding"><span>HOLDING PATTERNS</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-holding" class="radar-hidden-checkbox">
+        </div>
+
+        <div class="radar-ui-panel" data-panel-view="weather">
+
+            <div class="radar-panel-heading"><span>WEATHER</span><button type="button" class="radar-panel-close">×</button></div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-rain"><span>PRECIP RADAR</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="layer-rain" class="radar-hidden-checkbox">
+            <div class="radar-slider-container" id="rain-opacity-container"><div class="radar-ui-section" style="margin:0 0 2px 0">RADAR OPACITY</div><div class="radar-slider-output" id="rain-opacity-val">70%</div><input type="range" id="rain-opacity-slider" class="radar-ui-slider" min="10" max="100" step="10" value="70"></div>
+        
+            <div class="radar-source-panel-status" id="radar-rain-status">
+                Weather radar by Rainviewer<br>
+                Last update: --:--:--Z<br>
+                Next update: --:--:--Z
             </div>
-
-            <div class="radar-ui-section">Airspaces</div>
-            <label class="radar-ui-control">
-                <input type="checkbox" id="layer-airspace-all" checked> SHOW AIRSPACES
-            </label>
-
-            <!-- Floor/Ceiling altitude range filters. Each is a dual-
-                 thumb slider (two overlapping native <input type=range>
-                 elements) letting the user pick a [low, high] band.
-                 An airspace passes the combined filter when its own
-                 floor falls within the Floor range AND its own ceiling
-                 falls within the Ceiling range -- see
-                 isWithinAltitudeFilter in AirspaceManager. Values are
-                 in hundreds of feet (FL-style) from 0 to 600 (FL600 /
-                 60,000ft), matching the max altitude range PilotNet
-                 airspace data uses; the top step is treated as
-                 "and above" / UNL. -->
-            <div class="radar-slider-container">
-                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Floor Range</div>
-                <div class="radar-slider-output" id="airspace-floor-filter-val">SFC – UNL</div>
-                <div class="radar-dual-slider">
-                    <div class="radar-dual-slider-track"></div>
-                    <div class="radar-dual-slider-fill" id="airspace-floor-filter-fill"></div>
-                    <input type="range" id="airspace-floor-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0">
-                    <input type="range" id="airspace-floor-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600">
-                </div>
+<div class="radar-source-panel-status" id="radar-metar-status">
+                METAR by aviationweather.gov<br>
+                Last update: --:--:--Z<br>
+                Next update: --:--:--Z
             </div>
+        </div>
 
-            <div class="radar-slider-container">
-                <div class="radar-ui-section" style="margin: 0 0 2px 0;">Ceiling Range</div>
-                <div class="radar-slider-output" id="airspace-ceiling-filter-val">SFC – UNL</div>
-                <div class="radar-dual-slider">
-                    <div class="radar-dual-slider-track"></div>
-                    <div class="radar-dual-slider-fill" id="airspace-ceiling-filter-fill"></div>
-                    <input type="range" id="airspace-ceiling-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0">
-                    <input type="range" id="airspace-ceiling-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600">
-                </div>
-            </div>
+        <div class="radar-ui-panel" data-panel-view="airspaces">
 
-            <!-- Populated at runtime by AirspaceManager: one row per
-                 discovered `type` (CTR, TMA, D, P, R, ADHOC, etc.), each
-                 with 3 checkboxes -- STATIC, SCHEDULED, ACTIVATED -- that
-                 control that type's visibility per LARA_FUA status. The
-                 3 buttons above act on an entire column at once: each
-                 click sets every type's checkbox in that column to the
-                 same state (see toggleAllForKey in AirspaceManager). -->
-            <div class="radar-view-btn-row" style="margin-top: 8px;">
-                <button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn" title="Toggle all Static">S</button>
-                <button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn" title="Toggle all Scheduled">SC</button>
-                <button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn" title="Toggle all Activated">A</button>
-            </div>
+            <div class="radar-panel-heading"><span>AIRSPACES</span><button type="button" class="radar-panel-close">×</button></div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="layer-airspace-all"><span>SHOW AIRSPACES</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-airspace-all" class="radar-hidden-checkbox" checked>
+            <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">FLOOR RANGE</div><div class="radar-slider-output" id="airspace-floor-filter-val">SFC – UNL</div><div class="radar-dual-slider"><div class="radar-dual-slider-track"></div><div class="radar-dual-slider-fill" id="airspace-floor-filter-fill"></div><input type="range" id="airspace-floor-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0"><input type="range" id="airspace-floor-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600"></div></div>
+            <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">CEILING RANGE</div><div class="radar-slider-output" id="airspace-ceiling-filter-val">SFC – UNL</div><div class="radar-dual-slider"><div class="radar-dual-slider-track"></div><div class="radar-dual-slider-fill" id="airspace-ceiling-filter-fill"></div><input type="range" id="airspace-ceiling-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0"><input type="range" id="airspace-ceiling-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600"></div></div>
+            <div class="radar-ui-section">Status</div>
+            <div class="airspace-legend"><span><i class="status-dot static"></i>STATIC</span><span><i class="status-dot scheduled"></i>SCHEDULED</span><span><i class="status-dot activated"></i>ACTIVE</span></div>
+            <div class="radar-view-btn-row" style="margin-top:8px"><button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn" title="Toggle all Static">S</button><button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn" title="Toggle all Scheduled">SC</button><button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn" title="Toggle all Activated">A</button></div>
             <div id="airspace-type-filters"></div>
+        
+            <div class="radar-source-panel-status" id="radar-airspace-status">
+                Airspaces by PilotNet.hu<br>
+                Last update: --:--:--Z<br>
+                Next update: --:--:--Z
+            </div>
+        </div>
 
-            <div class="radar-ui-title" style="margin-top: 14px;">LHBP ATC Radio</div>
+        <div class="radar-ui-panel" data-panel-view="atc">
+            <div class="radar-panel-heading"><span>ATC AUDIO</span><button type="button" class="radar-panel-close">×</button></div>
             <div class="radar-atc-links">
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_app_122980&icao=lhbp" data-atc-popup>APP (122.980)</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_app_123860&icao=lhbp" data-atc-popup>APP (123.860)</a>
@@ -876,7 +1008,7 @@
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_info_119350&icao=lhbp" data-atc-popup>INFO (119.350)</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_atis&icao=lhbp" data-atc-popup>ATIS</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp1_2&icao=lhbp" data-atc-popup>TWR/INFO</a>
-                <a class="radar-atc-link radar-atc-link-all" href="https://www.liveatc.net/search/?icao=lhbp" target="_blank" rel="noopener noreferrer">ALL LHBP FEEDS &rarr;</a>
+                <a class="radar-atc-link radar-atc-link-all" href="https://www.liveatc.net/search/?icao=lhbp" target="_blank" rel="noopener noreferrer">ALL LHBP FEEDS →</a>
             </div>
         </div>
     </div>
@@ -914,75 +1046,88 @@
         const EDITOR_MODE = false;
 
         // ==========================================
-        // UI Collapsible Panel Controller
+        // Modern Settings Launcher / Independent Panels
         // ==========================================
         const uiWrapper = document.getElementById('radar-ui-wrapper');
-        const uiToggleBtn = document.getElementById('radar-ui-toggle');
+        const launcherButtons = document.querySelectorAll('.radar-launch-btn[data-panel]');
+        const uiPanels = document.querySelectorAll('.radar-ui-panel[data-panel-view]');
 
-        uiToggleBtn.addEventListener('click', function() {
-            uiWrapper.classList.toggle('collapsed');
-            if (uiWrapper.classList.contains('collapsed')) {
-                uiToggleBtn.textContent = '<';
-            } else {
-                uiToggleBtn.textContent = '>';
-            }
+        function closeAllSettings() {
+            uiPanels.forEach(panel => panel.classList.remove('is-open'));
+            launcherButtons.forEach(btn => btn.classList.remove('active'));
+        }
+
+        launcherButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const name = btn.dataset.panel;
+                const panel = document.querySelector(`.radar-ui-panel[data-panel-view="${name}"]`);
+                const wasOpen = panel && panel.classList.contains('is-open');
+                closeAllSettings();
+                if (!wasOpen && panel) {
+                    panel.classList.add('is-open');
+                    btn.classList.add('active');
+                }
+            });
+        });
+
+        document.querySelectorAll('.radar-panel-close').forEach(btn => {
+            btn.addEventListener('click', closeAllSettings);
         });
 
         // ==========================================
-        // View Preset Buttons
+        // View Presets
         // ==========================================
-        // Sets a checkbox's checked state AND fires a real 'change' event,
-        // so every listener already wired to that checkbox (toggles map,
-        // updateZoomGatedLayers, updateWaypointFilters, applyFiltering,
-        // etc.) reacts exactly as if the user had clicked it -- setting
-        // .checked alone does not dispatch 'change' in the DOM.
         function setCheckbox(id, checked) {
             const el = document.getElementById(id);
             if (!el) return;
             el.checked = checked;
-            // Always dispatch, even if the value didn't change: this is also
-            // used to sync dependent state (layer visibility, waypoint
-            // filters, etc.) at boot, where the checkbox's HTML default may
-            // already match the target value but the actual filtering logic
-            // has never run yet.
             el.dispatchEvent(new Event('change'));
         }
 
-        document.getElementById('app-view-btn').addEventListener('click', function() {
-            map.setView(INITIAL_VIEW_CENTER, APP_VIEW_ZOOM);
-            setCheckbox('layer-ground-features', false);
-            setCheckbox('layer-stands', false);
-			setCheckbox('show-ground-traffic', false);
-            setCheckbox('layer-airspace-all', true);
-        });
-        document.getElementById('twr-view-btn').addEventListener('click', function() {
-            map.setView(INITIAL_VIEW_CENTER, TWR_VIEW_ZOOM);
-            setCheckbox('layer-ground-features', true);
-            setCheckbox('layer-stands', true);
-			setCheckbox('show-ground-traffic', true);
-            setCheckbox('layer-airspace-all', false);
-        });
-        document.getElementById('gnd-view-btn').addEventListener('click', function() {
-            map.setView(INITIAL_VIEW_CENTER, GND_VIEW_ZOOM);
-            setCheckbox('layer-ground-features', true);
-            setCheckbox('layer-stands', true);
-			setCheckbox('show-ground-traffic', true);
-            setCheckbox('layer-airspace-all', false);
+        document.querySelectorAll('[data-view-preset]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('[data-view-preset]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const preset = btn.dataset.viewPreset;
+                if (preset === 'APP') {
+                    map.setView(INITIAL_VIEW_CENTER, APP_VIEW_ZOOM);
+                    setCheckbox('layer-ground-features', false);
+                    setCheckbox('layer-stands', false);
+                    setCheckbox('show-ground-traffic', false);
+                    setCheckbox('layer-airspace-all', true);
+                } else if (preset === 'TWR') {
+                    map.setView(INITIAL_VIEW_CENTER, TWR_VIEW_ZOOM);
+                    setCheckbox('layer-ground-features', true);
+                    setCheckbox('layer-stands', true);
+                    setCheckbox('show-ground-traffic', true);
+                    setCheckbox('layer-airspace-all', false);
+                } else if (preset === 'GND') {
+                    map.setView(INITIAL_VIEW_CENTER, GND_VIEW_ZOOM);
+                    setCheckbox('layer-ground-features', true);
+                    setCheckbox('layer-stands', true);
+                    setCheckbox('show-ground-traffic', true);
+                    setCheckbox('layer-airspace-all', false);
+                }
+            });
         });
 
         // ==========================================
-        // Runway Direction Swap (13 / 31): toggles every direction-tagged
-        // layer (RWY extensions, SID, STAR) to the selected direction, and
-        // switches the 7XX/8XX waypoint filter to match (13 in use hides
-        // the 31-direction BP8xx procedure points, and vice versa).
+        // Runway Direction Toggle + preset-state indicator
         // ==========================================
         let currentRwyDirection = "31";
+        let rwyApplyingPreset = false;
         const rwyDirectionBtn = document.getElementById('rwy-direction-btn');
+        const rwyPresetIds = ['layer-extensions-13','layer-extensions-31','layer-sid13','layer-sid31','layer-star13','layer-star31','filter-waypoints-8xx','filter-waypoints-7xx'];
+
+        function setRwyPristine(pristine) {
+            rwyDirectionBtn.classList.toggle('rwy-pristine', pristine);
+            rwyDirectionBtn.classList.toggle('rwy-modified', !pristine);
+        }
 
         function applyRwyDirection(direction) {
             currentRwyDirection = direction;
-            rwyDirectionBtn.innerHTML = `<span class="radar-reset-btn-line1">RWY DIR</span><span class="radar-reset-btn-line2">${direction}</span>`;
-
+            rwyApplyingPreset = true;
+            rwyDirectionBtn.querySelector('span').textContent = direction;
             const is13 = direction === "13";
             setCheckbox('layer-extensions-13', is13);
             setCheckbox('layer-extensions-31', !is13);
@@ -990,15 +1135,21 @@
             setCheckbox('layer-sid31', !is13);
             setCheckbox('layer-star13', is13);
             setCheckbox('layer-star31', !is13);
-
-            // 13 in use -> hide the 31-direction (BP8xx) procedure points.
-            // 31 in use -> hide the 13-direction (BP7xx) procedure points.
             setCheckbox('filter-waypoints-8xx', is13);
             setCheckbox('filter-waypoints-7xx', !is13);
+            rwyApplyingPreset = false;
+            setRwyPristine(true);
         }
 
         rwyDirectionBtn.addEventListener('click', function() {
             applyRwyDirection(currentRwyDirection === "13" ? "31" : "13");
+        });
+
+        rwyPresetIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', function() {
+                if (!rwyApplyingPreset) setRwyPristine(false);
+            });
         });
 
         // ==========================================
@@ -2282,7 +2433,7 @@
         trafficStatusEl.className = 'radar-ui-section';
         trafficStatusEl.id = 'traffic-source-status';
         trafficStatusEl.textContent = 'Traffic: connecting...';
-        document.querySelector('.radar-ui-panel').appendChild(trafficStatusEl);
+        document.querySelector('.radar-ui-panel[data-panel-view="aircraft"]').appendChild(trafficStatusEl);
 
         const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [11, 11] });
 
@@ -4106,14 +4257,7 @@
                 const container = document.getElementById('airspace-type-filters');
                 if (!container) return;
 
-                if (typeVisibility === null) {
-                    typeVisibility = new Map();
-                }
-                // Ensure every discovered type (including LARA_FUA_TYPE /
-                // ADHOC, which now gets the same 3-checkbox row as any
-                // other type) has a layer group and a visibility triple,
-                // defaulting new types to DEFAULT_TYPE_VISIBILITY so they
-                // aren't silently missing from the map.
+                if (typeVisibility === null) typeVisibility = new Map();
                 discoveredTypes.forEach((t) => {
                     if (!typeGroups.has(t)) getOrCreateTypeGroup(t);
                     getOrCreateTypeVisibility(t);
@@ -4121,66 +4265,44 @@
 
                 container.innerHTML = '';
 
-                // One-time header row labeling the 3 columns (short
-                // letters, since the full words don't fit tightly packed
-                // next to the checkboxes): S = static, SC = scheduled,
-                // A = activated.
                 const header = document.createElement('div');
                 header.className = 'airspace-type-header';
-                const headerChecks = document.createElement('div');
-                headerChecks.className = 'airspace-type-header-checks';
-                ['S', 'SC', 'A'].forEach((letter) => {
-                    const cell = document.createElement('div');
-                    cell.className = 'airspace-type-header-check';
-                    cell.textContent = letter;
-                    headerChecks.appendChild(cell);
-                });
-                header.appendChild(headerChecks);
-                header.appendChild(document.createTextNode('TYPE'));
+                header.innerHTML = '<div>TYPE</div><div class="airspace-type-header-check static-h">S</div><div class="airspace-type-header-check scheduled-h">SC</div><div class="airspace-type-header-check activated-h">A</div>';
                 container.appendChild(header);
 
                 const CHECK_DEFS = [
-                    { key: 'static', title: 'Static' },
-                    { key: 'scheduled', title: 'Scheduled' },
-                    { key: 'activated', title: 'Activated' }
+                    { key:'static', cls:'static-cell', title:'Static' },
+                    { key:'scheduled', cls:'scheduled-cell', title:'Scheduled' },
+                    { key:'activated', cls:'activated-cell', title:'Active' }
                 ];
 
-                Array.from(discoveredTypes).sort((a, b) => {
-                    // Keep ADHOC (LARA_FUA_TYPE) pinned last, everything
-                    // else alphabetical -- matches the previous layout
-                    // where ADHOC's control sat below the per-type list.
+                Array.from(discoveredTypes).sort((a,b) => {
                     if (a === LARA_FUA_TYPE) return 1;
                     if (b === LARA_FUA_TYPE) return -1;
                     return a.localeCompare(b);
-                }).forEach((type) => {
+                }).forEach(type => {
                     const displayName = type === LARA_FUA_TYPE ? 'ADHOC' : type;
                     const v = getOrCreateTypeVisibility(type);
-
                     const row = document.createElement('div');
                     row.className = 'airspace-type-row';
-
-                    const checksEl = document.createElement('div');
-                    checksEl.className = 'airspace-type-checks';
-
-                    CHECK_DEFS.forEach(({ key, title }) => {
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.id = `airspace-type-${type.toLowerCase()}-${key}`;
-                        checkbox.title = title;
-                        checkbox.checked = v[key];
-                        checkbox.addEventListener('change', () => {
-                            v[key] = checkbox.checked;
-                            applyFilters();
-                        });
-                        checksEl.appendChild(checkbox);
-                    });
 
                     const nameEl = document.createElement('div');
                     nameEl.className = 'airspace-type-name';
                     nameEl.textContent = displayName;
-
-                    row.appendChild(checksEl);
                     row.appendChild(nameEl);
+
+                    CHECK_DEFS.forEach(({key, cls, title}) => {
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = `airspace-matrix-check ${cls}`;
+                        checkbox.title = `${displayName}: ${title}`;
+                        checkbox.checked = !!v[key];
+                        checkbox.addEventListener('change', () => {
+                            v[key] = checkbox.checked;
+                            applyFilters();
+                        });
+                        row.appendChild(checkbox);
+                    });
                     container.appendChild(row);
                 });
             }
@@ -4493,5 +4615,33 @@
 
         bootApp();
     </script>
+
+<script>
+(function() {
+    function syncOnOff(btn, input) {
+        const state = btn.querySelector('.onoff-state');
+        if (!state) return;
+        state.textContent = input.checked ? 'ON' : 'OFF';
+        state.classList.toggle('ON', input.checked);
+        state.classList.toggle('OFF', !input.checked);
+    }
+    document.querySelectorAll('.radar-onoff-control').forEach(btn => {
+        const input = document.getElementById(btn.dataset.checkboxId);
+        if (!input) return;
+        syncOnOff(btn, input);
+        input.addEventListener('change', () => syncOnOff(btn, input));
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            input.checked = !input.checked;
+            input.dispatchEvent(new Event('change', {bubbles:true}));
+        });
+    });
+
+    // Keep the real waypoint layer enabled on initial load; its existing
+    // application logic remains responsible for subsequent view/filter changes.
+    const waypointInput = document.getElementById('layer-waypoints');
+    if (waypointInput) waypointInput.checked = true;
+})();
+</script>
 </body>
 </html>
