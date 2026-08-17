@@ -3017,10 +3017,11 @@
                     state.ui.dataBlock.setLatLng(leaderEnd);
 
                     const isBelowTA = interpAlt < 10000;
-                    const altPrefix = isBelowTA ? 'A' : 'F';
-                    const flStr = state.onGround ? 'GND' : Math.round(interpAlt / 100).toString().padStart(3, '0');
+                    const altPrefix = isBelowTA ? 'A' : '';
+                    const flValue = Math.round(interpAlt / 100);
+                    const flStr = state.onGround ? 'GND' : (isBelowTA ? flValue.toString() : flValue.toString().padStart(3, '0'));
                     const altLabel = state.onGround ? flStr : `${altPrefix}${flStr}`;
-                    const spdStr = Math.round(interpSpd).toString().padStart(3, '0');
+                    const spdStr = `N${Math.round(interpSpd).toString().padStart(3, '0')}`;
                     const labelCallsign = getFormattedCallsign(state.callsign, useLongFormat);
                     
                     let trend = "";
@@ -3517,7 +3518,7 @@
             const discoveredTypes = new Set();
 
             const DEFAULT_TYPE_VISIBILITY = Object.freeze({
-                static: true,
+                static: false,
                 scheduled: true,
                 activated: true
             });
