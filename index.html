@@ -449,7 +449,7 @@
             font-size: 11px !important;
         }
         .radar-launch-btn span {
-            font-size: 9px !important;
+            font-size: 14px !important;
         }
         .radar-panel-heading {
             font-size: 12px !important;
@@ -511,7 +511,7 @@
             padding:3px 5px;
             border-radius:4px;
             text-align:center;
-            font-size:9px;
+            font-size:11px;
             font-weight:700;
             letter-spacing:.4px;
         }
@@ -852,6 +852,12 @@
             text-shadow: none;
             background: none;
             border: none;
+			text-shadow:
+                -1px -1px 0 rgba(0,0,0,0.95),
+                 1px -1px 0 rgba(0,0,0,0.95),
+                -1px  1px 0 rgba(0,0,0,0.95),
+                 1px  1px 0 rgba(0,0,0,0.95),
+                 0 0 3px rgba(0,0,0,0.95);
         }
 
 
@@ -889,6 +895,147 @@
         .rain-opacity-container {
             display: block !important;
             visibility: visible !important;
+        }
+
+
+        /* Airspace matrix status headers */
+        .airspace-type-header-check.static-h {
+            color: #aaa !important;
+        }
+        .airspace-type-header-check.scheduled-h {
+            color: #ffc107 !important;
+        }
+        .airspace-type-header-check.activated-h {
+            color: #ff3b30 !important;
+        }
+
+        /* Slightly larger airspace type labels */
+        .airspace-type-row .airspace-type-name,
+        .airspace-type-name {
+            font-size: 11px !important;
+        }
+
+
+        /* Sliders use the same flat option background as the other controls.
+           Remove the distinct rounded slider-card treatment. */
+        .radar-slider-container {
+            margin: 2px 0 !important;
+            padding: 0 8px !important;
+            min-height: 34px;
+            box-sizing: border-box;
+            border-radius: 0 !important;
+            border: 1px solid rgba(255,255,255,.08) !important;
+            background: rgba(255,255,255,.025) !important;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .radar-slider-container .radar-ui-section {
+            margin: 0 0 2px 0 !important;
+        }
+
+        .radar-slider-container .radar-slider-output {
+            margin-bottom: 2px !important;
+        }
+
+
+        /* Slider titles match regular option text. */
+        .radar-slider-container .radar-ui-section {
+            color: #aeb6b1 !important;
+            font-family: 'Google Sans Code', monospace !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
+        }
+
+
+        /* Match slider container padding to the regular option controls. */
+        .radar-slider-container {
+            padding: 2px 8px !important;
+        }
+
+
+        /* Increase only the vertical slider padding, keeping horizontal
+           padding aligned with the other options. */
+        .radar-slider-container {
+            padding: 6px 8px !important;
+        }
+
+
+        /* Align the airspace dual-slider thumbs with the filter track. */
+        .radar-dual-slider input[type="range"]::-webkit-slider-thumb {
+            margin-top: 0 !important;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-thumb {
+            transform: translateY(0) !important;
+        }
+
+
+        /* Airspace status toggles: full labels replace the separate legend. */
+        .airspace-static-toggle { color:#aaa !important; }
+        .airspace-scheduled-toggle { color:#ffc107 !important; }
+        .airspace-active-toggle { color:#ff3b30 !important; }
+        .airspace-static-toggle,
+        .airspace-scheduled-toggle,
+        .airspace-active-toggle {
+            font-size:10px !important;
+            font-weight:600 !important;
+            letter-spacing:.3px !important;
+        }
+
+
+        .airspace-status-title {
+            margin-left: 8px;
+            color: #737b76;
+            font-size: 8px;
+            font-weight: 500;
+            letter-spacing: .5px;
+        }
+
+
+        .airspace-status-subtitle {
+            color: #737b76 !important;
+            font-size: 8px !important;
+            font-weight: 500 !important;
+            letter-spacing: .5px !important;
+            margin-top: 6px !important;
+        }
+
+
+        /* Match STATUS VISIBILITY to the other panel subtitles. */
+        .airspace-status-subtitle {
+            font-size: 11px !important;
+        }
+
+
+        /* Settings panel close controls: simple, larger X with no button chrome. */
+        .radar-ui-panel .radar-panel-close {
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            padding: 0 2px !important;
+            margin: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #aeb6b1 !important;
+            font-size: 22px !important;
+            font-weight: 400 !important;
+            line-height: 1 !important;
+        }
+
+        .radar-ui-panel .radar-panel-close:hover,
+        .radar-ui-panel .radar-panel-close:focus,
+        .radar-ui-panel .radar-panel-close:active {
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #e4e9e5 !important;
+            outline: none !important;
         }
 
 </style>
@@ -988,9 +1135,9 @@
             <button type="button" class="radar-onoff-control" data-checkbox-id="layer-airspace-all"><span>SHOW AIRSPACES</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-airspace-all" class="radar-hidden-checkbox" checked>
             <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">FLOOR RANGE</div><div class="radar-slider-output" id="airspace-floor-filter-val">SFC – UNL</div><div class="radar-dual-slider"><div class="radar-dual-slider-track"></div><div class="radar-dual-slider-fill" id="airspace-floor-filter-fill"></div><input type="range" id="airspace-floor-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0"><input type="range" id="airspace-floor-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600"></div></div>
             <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">CEILING RANGE</div><div class="radar-slider-output" id="airspace-ceiling-filter-val">SFC – UNL</div><div class="radar-dual-slider"><div class="radar-dual-slider-track"></div><div class="radar-dual-slider-fill" id="airspace-ceiling-filter-fill"></div><input type="range" id="airspace-ceiling-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0"><input type="range" id="airspace-ceiling-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600"></div></div>
-            <div class="radar-ui-section">Status</div>
-            <div class="airspace-legend"><span><i class="status-dot static"></i>STATIC</span><span><i class="status-dot scheduled"></i>SCHEDULED</span><span><i class="status-dot activated"></i>ACTIVE</span></div>
-            <div class="radar-view-btn-row" style="margin-top:8px"><button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn" title="Toggle all Static">S</button><button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn" title="Toggle all Scheduled">SC</button><button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn" title="Toggle all Activated">A</button></div>
+            <div class="radar-ui-section airspace-status-subtitle">STATUS VISIBILITY</div>
+            
+            <div class="radar-view-btn-row" style="margin-top:8px"><button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn airspace-static-toggle" class="radar-reset-btn" title="Toggle all Static">STATIC</button><button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn airspace-scheduled-toggle" class="radar-reset-btn" title="Toggle all Scheduled">SCHEDULED</button><button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn airspace-active-toggle" class="radar-reset-btn" title="Toggle all Active">ACTIVE</button></div>
             <div id="airspace-type-filters"></div>
         
             <div class="radar-source-panel-status" id="radar-airspace-status">
