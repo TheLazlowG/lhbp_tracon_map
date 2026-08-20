@@ -325,6 +325,125 @@
             line-height: 1.1;
             white-space: nowrap;
         }
+        .atc-label-clickable {
+            pointer-events: auto !important;
+            cursor: pointer;
+        }
+
+        /* Aircraft Info Panel (opens on datablock click) */
+        .aircraft-info-panel {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            z-index: 1100;
+            width: min(340px, calc(100vw - 24px));
+            max-height: calc(100vh - 24px);
+            overflow-x: hidden;
+            overflow-y: auto;
+            background: rgba(13, 16, 15, .94);
+            border: 1px solid rgba(255,255,255,.12);
+            border-top: none;
+            border-left: none;
+            border-radius: 0;
+            padding: 16px;
+            box-sizing: border-box;
+            font-family: 'Google Sans Code', monospace;
+            color: #8b948e;
+            box-shadow: 0 18px 55px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.025);
+            backdrop-filter: blur(18px) saturate(115%);
+            display: none;
+        }
+        .aircraft-info-panel.open { display: block; }
+        .aircraft-info-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            border-bottom: 1px solid rgba(255, 255, 255, .09);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .aircraft-info-panel-callsign {
+            color: #5DEB3D;
+            font-size: 15px;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+        }
+        .aircraft-info-panel-close {
+            width: 26px;
+            height: 26px;
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 7px;
+            background: rgba(255,255,255,.035);
+            color: #7c8580;
+            cursor: pointer;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 24px;
+            text-align: center;
+        }
+        .aircraft-info-panel-close:hover { color: #fff; background: rgba(255,255,255,.08); }
+        .aircraft-info-panel-photo-wrap {
+            width: 100%;
+            aspect-ratio: auto;
+            background: rgba(255,255,255,.025);
+            border: 1px solid rgba(255, 255, 255, .10);
+            border-radius: 7px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .aircraft-info-panel-photo-wrap img {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            display: block;
+            object-fit: contain;
+            display: block;
+        }
+        .aircraft-info-panel-photo-placeholder {
+            color: #59625d;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .aircraft-info-panel-credit {
+            font-size: 9px;
+            color: #59625d;
+            text-align: right;
+            margin: -6px 0 10px 0;
+            letter-spacing: 0.3px;
+        }
+        .aircraft-info-panel-credit a { color: #59625d; text-decoration: none; }
+        .aircraft-info-panel-credit a:hover { color: #8b948e; }
+        .aircraft-info-panel-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .aircraft-info-panel-row:last-child { border-bottom: none; }
+        .aircraft-info-panel-row-label {
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #59625d;
+        }
+        .aircraft-info-panel-row-value {
+            color: #e2e6e3;
+            font-weight: normal;
+            text-align: right;
+        }
+        .aircraft-info-panel-row-value.squawk-emergency { color: #FF3B30; }
+        /* Aircraft info panel: never introduce horizontal scrolling; let long values wrap. */
+        .aircraft-info-panel-row { min-width: 0; gap: 12px; }
+        .aircraft-info-panel-row-label,
+        .aircraft-info-panel-row-value { min-width: 0; overflow-wrap: anywhere; }
+        .aircraft-info-panel-row-value { max-width: 62%; }
+
 
         /* Clean containers for custom markers */
         .wp-triangle-icon {
@@ -1080,9 +1199,13 @@
             <div class="radar-ui-section">Traffic Display</div>
             <button type="button" class="radar-onoff-control" data-checkbox-id="layer-traffic"><span>AIR TRAFFIC</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-traffic" class="radar-hidden-checkbox" checked>
             <button type="button" class="radar-onoff-control" data-checkbox-id="show-ground-traffic"><span>GROUND AIRCRAFT</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="show-ground-traffic" class="radar-hidden-checkbox">
-            <button type="button" class="radar-onoff-control" data-checkbox-id="callsign-format-long"><span>TELEPHONY CALLSIGNS</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="callsign-format-long" class="radar-hidden-checkbox" checked>
             <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">MAX ALTITUDE</div><div class="radar-slider-output" id="alt-filter-val">FL250</div><input type="range" id="alt-filter-slider" class="radar-ui-slider" min="20" max="450" step="10" value="250"></div>
+
+            <div class="radar-ui-section">Datablock</div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="callsign-format-long"><span>TELEPHONY CALLSIGNS</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="callsign-format-long" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="show-selected-altitude"><span>SELECTED ALTITUDE</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="show-selected-altitude" class="radar-hidden-checkbox">
             <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">PREDICTION LINE</div><div class="radar-slider-output" id="predict-len-val">0.25 MIN</div><input type="range" id="predict-len-slider" class="radar-ui-slider" min="0.0" max="5" step="0.25" value="0.25"></div>
+
             <div class="radar-ui-section">Data Sources</div>
             <button type="button" class="radar-onoff-control" data-checkbox-id="src-mlat"><span>MLAT</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="src-mlat" class="radar-hidden-checkbox">
             <button type="button" class="radar-onoff-control" data-checkbox-id="src-other"><span>ADS-B</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="src-other" class="radar-hidden-checkbox" checked>
@@ -1162,6 +1285,41 @@
         </div>
     </div>
 
+    <div id="aircraft-info-panel" class="aircraft-info-panel">
+        <div class="aircraft-info-panel-header">
+            <span class="aircraft-info-panel-callsign" id="aircraft-info-callsign">--</span>
+            <span class="aircraft-info-panel-close" id="aircraft-info-close">&times;</span>
+        </div>
+        <div class="aircraft-info-panel-photo-wrap" id="aircraft-info-photo-wrap">
+            <span class="aircraft-info-panel-photo-placeholder" id="aircraft-info-photo-placeholder">NO PHOTO</span>
+        </div>
+        <div class="aircraft-info-panel-credit" id="aircraft-info-credit" style="display:none;"></div>
+
+        <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Registration</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-reg">--</span>
+        </div>
+        <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Country</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-country">--</span>
+        </div>
+        <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Operator</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-operator">--</span>
+        </div>
+        <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Type</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-type">--</span>
+        </div>
+        <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Type Name</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-type-name">--</span>
+        </div>
+        <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Squawk</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-squawk">--</span>
+        </div>
+    </div>
     <div id="radar-scope"></div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -1518,6 +1676,19 @@
         map.createPane('aircraftPane');
         map.getPane('aircraftPane').style.zIndex = 700;
 
+        // Leaflet's Canvas renderer (used because the map runs with
+        // preferCanvas: true) draws every non-explicitly-rendered vector
+        // layer -- circleMarkers, polylines -- into one shared <canvas>
+        // per pane. That canvas listens for clicks across its own
+        // full-viewport bounding box and does its own internal hit-test,
+        // so it intercepts clicks meant for a Tooltip DOM element sharing
+        // the same pane even when the tooltip is later in DOM order.
+        // Datablocks get their own pane above aircraftPane so their
+        // clicks reach the tooltip instead of being swallowed by the
+        // traffic canvas (hitArea circles, speed/leader lines, history dots).
+        map.createPane('datablockPane');
+        map.getPane('datablockPane').style.zIndex = 710;
+
         // Editor-mode label pane, created here (before any markers try to
         // use it) rather than inside initLabelEditor(), since that isn't
         // called until after every waypoint's editable label marker has
@@ -1657,7 +1828,7 @@
         const majorTickLineStyle = { color: '#ffffff', weight: 2, opacity: 0.8 };
         
         const sid31Style = { color: '#ffffff', weight: 1.5, dashArray: '6, 4', opacity: 0.6 };
-        const sid13LStyle = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7 };
+        const sid13Style = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7 };
         const star31Style = { color: '#ffffff', weight: 1.5, dashArray: '10, 4, 2, 4', opacity: 0.6 };
         const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5 };
         const holdingStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4 };
@@ -1717,7 +1888,7 @@
         ]).addTo(map);
         
         const sid31Group = L.layerGroup();
-        const sid13lGroup = L.layerGroup(); 
+        const sid13Group = L.layerGroup(); 
         const star31Group = L.layerGroup();
         const star13Group = L.layerGroup();
 
@@ -2231,13 +2402,14 @@
         }
 
         // Waypoint filter definitions
-        const RWY31_FILTER = [
+		const RWY31_FILTER = [
             /^BP8\d\d$/,
-            "BP328","BP329","BP331"
+            "BP328","BP329","BP331","BEREV","ODVAS","NICRA","ATICO","FUTNA","OFENA"
         ];
 
         const RWY13_FILTER = [
-            /^BP7\d\d$/
+            /^BP7\d\d$/,
+			"HUZTA","ALZUR","CATUZ","ECMAN","TORAZ","GIFRA"
         ];
 
         function matchesWaypointFilter(name, rules) {
@@ -2464,21 +2636,21 @@
 			L.polyline([wp["BP822"], wp["GAZDA"]], sid31Style).addTo(sid31Group);
 
 			// SID 13L
-			L.polyline([rwy31R, wp["BP701"]], sid13LStyle).addTo(sid13lGroup);
-			drawProcedure([{ at: "BP701", overfly: { inbound: 120, nextInbound: 047 } },"BP702"], sid13LStyle, sid13lGroup);
-			drawProcedure([{ at: "BP701", overfly: { inbound: 120, nextInbound: 242 } },"BP712"], sid13LStyle, sid13lGroup);
-			L.polyline([rwy31L, wp["BP711"]], sid13LStyle).addTo(sid13lGroup);
-			drawProcedure([{ at: "BP711", overfly: { inbound: 132, nextInbound: 047 } },"BP702"], sid13LStyle, sid13lGroup);
-			drawProcedure([{ at: "BP711", overfly: { inbound: 132, nextInbound: 242 } },"BP712"], sid13LStyle, sid13lGroup);
-			L.polyline([wp["BP712"], wp["DUZLA"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP712"], wp["FAHAZ"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP712"], wp["GAZDA"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP702"], wp["BP703"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP705"], wp["WITRI"]], sid13LStyle).addTo(sid13lGroup);
-			L.polyline([wp["BP702"], wp["VETIK"]], sid13LStyle).addTo(sid13lGroup);
+			L.polyline([rwy31R, wp["BP701"]], sid13Style).addTo(sid13Group);
+			drawProcedure([{ at: "BP701", overfly: { inbound: 120, nextInbound: 047 } },"BP702"], sid13Style, sid13Group);
+			drawProcedure([{ at: "BP701", overfly: { inbound: 120, nextInbound: 242 } },"BP712"], sid13Style, sid13Group);
+			L.polyline([rwy31L, wp["BP711"]], sid13Style).addTo(sid13Group);
+			drawProcedure([{ at: "BP711", overfly: { inbound: 132, nextInbound: 047 } },"BP702"], sid13Style, sid13Group);
+			drawProcedure([{ at: "BP711", overfly: { inbound: 132, nextInbound: 242 } },"BP712"], sid13Style, sid13Group);
+			L.polyline([wp["BP712"], wp["DUZLA"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP712"], wp["FAHAZ"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP712"], wp["GAZDA"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP712"], wp["PUCOG"], wp["GILEP"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP702"], wp["BP703"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP703"], wp["BP704"], wp["BADOV"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP703"], wp["BP705"], wp["LITKU"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP705"], wp["WITRI"]], sid13Style).addTo(sid13Group);
+			L.polyline([wp["BP702"], wp["VETIK"]], sid13Style).addTo(sid13Group);
 
 			// STAR 31L/31R
 			L.polyline([wp["ANEXA"], wp["BP840"], wp["BP841"], wp["BP842"], wp["BP843"], wp["BP844"], wp["ATICO"], wp["BP855"]], star31Style).addTo(star31Group);
@@ -2716,6 +2888,250 @@
             deselectAllAircraft();
         });
 
+        // ---- Aircraft Info Panel ------------------------------------------
+        // Opens on datablock click. Shows registration/type/squawk pulled
+        // from the live ADS-B state, plus a photo looked up from
+        // planespotters.net's public (unofficial) photo endpoint, keyed by
+        // ICAO hex. Photo lookups are cached per hex for the page's
+        // lifetime so re-clicking the same aircraft doesn't refetch.
+        const aircraftInfoPanelEl = document.getElementById('aircraft-info-panel');
+        const aircraftInfoCallsignEl = document.getElementById('aircraft-info-callsign');
+        const aircraftInfoRegEl = document.getElementById('aircraft-info-reg');
+        const aircraftInfoTypeEl = document.getElementById('aircraft-info-type');
+        const aircraftInfoWakeEl = document.getElementById('aircraft-info-wake');
+        const aircraftInfoSquawkEl = document.getElementById('aircraft-info-squawk');
+        const aircraftInfoAltitudeEl = document.getElementById('aircraft-info-altitude');
+        const aircraftInfoSelectedAltitudeEl = document.getElementById('aircraft-info-selected-altitude');
+        const aircraftInfoSpeedEl = document.getElementById('aircraft-info-speed');
+        const aircraftInfoHeadingEl = document.getElementById('aircraft-info-heading');
+        const aircraftInfoSourceEl = document.getElementById('aircraft-info-source');
+        const aircraftInfoHexEl = document.getElementById('aircraft-info-hex');
+        const aircraftInfoPhotoWrapEl = document.getElementById('aircraft-info-photo-wrap');
+        const aircraftInfoPhotoPlaceholderEl = document.getElementById('aircraft-info-photo-placeholder');
+        const aircraftInfoCreditEl = document.getElementById('aircraft-info-credit');
+
+        let openAircraftInfoId = null;
+        const planespottersPhotoCache = new Map(); // hex -> {url, link, photographer} | null
+
+        // Squawk codes that denote an emergency/special condition, shown in
+        // red instead of the normal value color.
+        const EMERGENCY_SQUAWKS = new Set(['7500', '7600', '7700']);
+
+        function closeAircraftInfoPanel() {
+            openAircraftInfoId = null;
+            aircraftInfoPanelEl.classList.remove('open');
+        }
+
+        const aircraftMetadataCache = new Map();
+
+        async function fetchAircraftMetadata(hex) {
+            if (!hex) return null;
+
+            const key = String(hex).trim().toLowerCase();
+            if (aircraftMetadataCache.has(key)) {
+                return aircraftMetadataCache.get(key);
+            }
+
+            const promise = fetch(
+                `https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(key)}`,
+                {
+                    cache: 'force-cache',
+                    headers: { 'Accept': 'application/json' }
+                }
+            )
+                .then(async response => {
+                    if (!response.ok) {
+                        throw new Error(`ADSBdb HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    return data?.response?.aircraft || null;
+                })
+                .catch(error => {
+                    console.warn('Aircraft metadata lookup failed:', error);
+                    return null;
+                });
+
+            aircraftMetadataCache.set(key, promise);
+            return promise;
+        }
+
+        async function enrichAircraftInfoPanel(id) {
+            const state = aircraftState[id];
+            if (!state) return;
+
+            const metadata = await fetchAircraftMetadata(id);
+            if (!metadata || !aircraftState[id]) return;
+
+            const current = aircraftState[id];
+
+            // ADSBdb fields:
+            // registered_owner_country_name = registration country
+            // registered_owner             = registered operator/owner
+            current.country =
+                metadata.registered_owner_country_name ||
+                current.country ||
+                '';
+
+            current.operator =
+                metadata.registered_owner ||
+                current.operator ||
+                '';
+
+            if (openAircraftInfoId === id) {
+                renderAircraftInfoPanel(id);
+            }
+        }
+
+        function renderAircraftInfoPanel(id) {
+            const state = aircraftState[id];
+            if (!state) return;
+
+            aircraftInfoCallsignEl.textContent =
+                (state.callsign || 'UNK').trim() || 'UNK';
+
+            aircraftInfoRegEl.textContent =
+                state.registration || 'UNKNOWN';
+
+            document.getElementById('aircraft-info-country').textContent =
+                state.country || 'UNKNOWN';
+
+            document.getElementById('aircraft-info-operator').textContent =
+                state.operator || 'UNKNOWN';
+
+            aircraftInfoTypeEl.textContent =
+                state.actype || 'UNK';
+
+            document.getElementById('aircraft-info-type-name').textContent =
+                state.typeName || 'UNKNOWN';
+
+            const squawk = state.squawk || '----';
+            aircraftInfoSquawkEl.textContent = squawk;
+            aircraftInfoSquawkEl.classList.toggle(
+                'squawk-emergency',
+                EMERGENCY_SQUAWKS.has(state.squawk)
+            );
+        }
+
+        function renderAircraftInfoPhoto(entry) {
+            aircraftInfoPhotoWrapEl.innerHTML = '';
+            if (entry && entry.url) {
+                const link = document.createElement('a');
+                link.href = entry.link || entry.url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.style.display = 'block';
+                link.style.width = '100%';
+                const img = document.createElement('img');
+                img.src = entry.url;
+                img.alt = 'Aircraft photo';
+                if (entry.width && entry.height) img.setAttribute('width', entry.width);
+                if (entry.width && entry.height) img.setAttribute('height', entry.height);
+                link.appendChild(img);
+                aircraftInfoPhotoWrapEl.appendChild(link);
+                if (entry.photographer) {
+                    aircraftInfoCreditEl.style.display = 'block';
+                    if (entry.link) {
+                        aircraftInfoCreditEl.innerHTML = `Photo: <a href="${entry.link}" target="_blank" rel="noopener">${entry.photographer}</a>`;
+                    } else {
+                        aircraftInfoCreditEl.textContent = `Photo: ${entry.photographer}`;
+                    }
+                } else {
+                    aircraftInfoCreditEl.style.display = 'none';
+                    aircraftInfoCreditEl.innerHTML = '';
+                }
+            } else {
+                const placeholder = document.createElement('span');
+                placeholder.className = 'aircraft-info-panel-photo-placeholder';
+                placeholder.textContent = 'NO PHOTO';
+                aircraftInfoPhotoWrapEl.appendChild(placeholder);
+                aircraftInfoCreditEl.style.display = 'none';
+                aircraftInfoCreditEl.innerHTML = '';
+            }
+        }
+
+        // Looks up a photo for the given ICAO hex via planespotters.net's
+        // public photo endpoint (the same unofficial endpoint used by
+        // globe.adsbexchange.com / tar1090-family ADS-B front ends). Falls
+        // back to no photo on any error or unexpected response shape.
+        async function fetchPlanespottersPhoto(hex, reg, actype) {
+            if (planespottersPhotoCache.has(hex)) {
+                return planespottersPhotoCache.get(hex);
+            }
+            try {
+                const params = new URLSearchParams();
+                if (reg) params.set('reg', reg);
+                if (actype && actype !== 'UNK') params.set('icaoType', actype);
+                const qs = params.toString();
+                const url = `https://api.planespotters.net/pub/photos/hex/${encodeURIComponent(hex)}${qs ? '?' + qs : ''}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const photo = Array.isArray(data.photos) && data.photos.length > 0 ? data.photos[0] : null;
+                let entry = null;
+                if (photo) {
+                    const src = (photo.image && photo.image.src)
+                        || (photo.thumbnail_large && photo.thumbnail_large.src)
+                        || (photo.thumbnail && photo.thumbnail.src)
+                        || null;
+                    if (src) {
+                        entry = {
+                            url: src,
+                            link: photo.link || null,
+                            photographer: photo.photographer || null,
+                            width: Number(photo.image?.width || photo.width || photo.thumbnail_large?.width || photo.thumbnail?.width) || null,
+                            height: Number(photo.image?.height || photo.height || photo.thumbnail_large?.height || photo.thumbnail?.height) || null
+                        };
+                    }
+                }
+                planespottersPhotoCache.set(hex, entry);
+                return entry;
+            } catch (err) {
+                console.warn('Planespotters photo lookup failed:', err.message);
+                planespottersPhotoCache.set(hex, null);
+                return null;
+            }
+        }
+
+        function openAircraftInfoPanel(id) {
+            const state = aircraftState[id];
+            if (!state) return;
+
+            openAircraftInfoId = id;
+            aircraftInfoPanelEl.classList.add('open');
+            renderAircraftInfoPanel(id);
+            enrichAircraftInfoPanel(id);
+            renderAircraftInfoPhoto(null);
+            aircraftInfoPhotoPlaceholderEl.textContent = 'LOADING...';
+
+            const hex = id;
+            const reg = state.registration;
+            const actype = state.actype;
+            fetchPlanespottersPhoto(hex, reg, actype).then(entry => {
+                // Only apply if the panel is still showing this aircraft
+                // (avoids a slow response clobbering a later selection).
+                if (openAircraftInfoId === id) {
+                    renderAircraftInfoPhoto(entry);
+                }
+            });
+        }
+
+        document.getElementById('aircraft-info-close').addEventListener('click', function(e) {
+            e.stopPropagation();
+            closeAircraftInfoPanel();
+        });
+        aircraftInfoPanelEl.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // Close the aircraft info panel whenever the user clicks elsewhere.
+        document.addEventListener('click', function(e) {
+            if (!openAircraftInfoId) return;
+            if (aircraftInfoPanelEl.contains(e.target)) return;
+            const tooltip = e.target.closest && e.target.closest('.atc-label-clickable');
+            if (tooltip) return;
+            closeAircraftInfoPanel();
+        }, true);
+
         // Recomputes fillOpacity for every history dot of an aircraft, fading
         // from HISTORY_DOT_MAX_OPACITY (newest visible dot) down to
         // HISTORY_DOT_MIN_OPACITY (oldest dot still in the trail). Dots that
@@ -2745,7 +3161,18 @@
                 id: id,
                 callsign: callsign,
                 actype: "UNK",
+                wake: "",
+                registration: "",
+                country: "",
+                operator: "",
+                typeName: "",
+
+
+                squawk: "",
+                selectedAltitude: null,
                 latestAlt: 0,
+                latestSpeed: 0,
+                latestHeading: 0,
                 onGround: false,
                 srcType: srcType || "OTHER",
                 telemetry: [],
@@ -2758,8 +3185,8 @@
                     hitArea: L.circleMarker([0, 0], { radius: 9, opacity: 0, fillOpacity: 0, interactive: true, bubblingMouseEvents: false, pane: 'aircraftPane' }),
                     speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 1, interactive: false, pane: 'aircraftPane' }),
                     leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.5, opacity: 1, interactive: false, pane: 'aircraftPane' }),
-                    dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0, pane: 'aircraftPane' })
-                        .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label', offset: [0, -10], pane: 'aircraftPane' })
+                    dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0, pane: 'datablockPane' })
+                        .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label atc-label-clickable', offset: [0, -10], pane: 'datablockPane', interactive: true })
                 }
             };
             const ui = aircraftState[id].ui;
@@ -2778,6 +3205,16 @@
             ui.marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 selectAircraft(id);
+            });
+            // Leaflet registers a bound tooltip's own DOM element as an
+            // interactive target on the Tooltip layer itself (see
+            // DivOverlay.prototype._initLayout -> addInteractiveTarget),
+            // not on the marker it's attached to -- so the click handler
+            // has to go on the tooltip object, not on ui.dataBlock.
+            ui.dataBlock.getTooltip().on('click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                selectAircraft(id);
+                openAircraftInfoPanel(id);
             });
         }
 
@@ -2807,7 +3244,16 @@
                 const state = aircraftState[t.id];
                 state.callsign = t.call;
                 state.actype = t.type || "UNK";
+                state.wake = t.wake || "";
+                state.registration = t.reg || "";
+                state.country = t.country || state.country || "";
+                state.operator = t.operator || state.operator || "";
+                state.typeName = t.typeName || "";
+                state.squawk = t.squawk || "";
+                state.selectedAltitude = t.selectedAlt ?? null;
                 state.latestAlt = t.alt;
+                state.latestSpeed = t.spd;
+                state.latestHeading = t.hdg;
                 state.onGround = !!t.onGround;
                 state.srcType = t.srcType || "OTHER";
                 updateMarkerSourceShape(t.id);
@@ -2944,11 +3390,41 @@
         const callsignFormatCheckbox = document.getElementById('callsign-format-long');
         const radarSearchInput = document.getElementById('radar-search');
 
+        function simplifyWakeCategory(category) {
+            const code = String(category || '').trim().toUpperCase();
+            if (code === 'A1' || code === 'A2' || code === 'A7') return 'L';
+            if (code === 'A3' || code === 'A4') return 'M';
+            if (code === 'A5' || code === 'A6') return 'H';
+            return '';
+        }
+
+        function formatDatablockAltitude(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return '---';
+            const belowTA = n < 10000;
+            const flValue = Math.round(n / 100);
+            const flStr = belowTA
+                ? flValue.toString()
+                : flValue.toString().padStart(3, '0');
+            return `${belowTA ? 'A' : ''}${flStr}`;
+        }
+
         function renderLoop() {
             const renderTime = Date.now() - RENDER_DELAY_MS;
             const useLongFormat = callsignFormatCheckbox.checked;
 
             const searchQuery = radarSearchInput ? radarSearchInput.value.toUpperCase().trim() : "";
+
+            // Keep the open aircraft info panel's live fields (squawk,
+            // callsign, type) current as new telemetry arrives, without
+            // re-fetching the planespotters photo every frame.
+            if (openAircraftInfoId) {
+                if (aircraftState[openAircraftInfoId]) {
+                    renderAircraftInfoPanel(openAircraftInfoId);
+                } else {
+                    closeAircraftInfoPanel();
+                }
+            }
 
             Object.keys(aircraftState).forEach(id => {
                 const state = aircraftState[id];
@@ -3041,9 +3517,18 @@
                     const dataLineColor = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,1.0)';
                     const acTypeColor   = isAircraftMatched ? '#FFFF00' : 'rgba(255,255,255,0.5)';
 
+                    const selectedAltitudeEnabled = document.getElementById('show-selected-altitude').checked;
+                    const selectedAltitudeLabel = selectedAltitudeEnabled
+                        ? formatDatablockAltitude(state.selectedAltitude)
+                        : '';
+                    const wakeLabel = simplifyWakeCategory(state.wake);
+                    const typeLabel = wakeLabel ? `${state.actype}/${wakeLabel}` : state.actype;
+
                     const blockHTML = `<div style="color:${callsignColor}; font-weight:${isAircraftMatched ? 'bold' : 'normal'};">${labelCallsign}</div>` +
                                       `<div style="color:${dataLineColor};">${altLabel}${trend} &nbsp;${spdStr}</div>` +
-                                      `<div style="color:${acTypeColor};">${state.actype}</div>`;
+                                      (selectedAltitudeEnabled
+                                          ? `<div style="color:${dataLineColor};">${selectedAltitudeLabel}</div><div style="color:${acTypeColor};">${typeLabel}</div>`
+                                          : `<div style="color:${acTypeColor};">${typeLabel}</div>`);
                     
                     if (state.lastHTML !== blockHTML) {
                         state.ui.dataBlock.setTooltipContent(blockHTML);
@@ -3079,16 +3564,31 @@
                     srcType = 'MLAT';
                 }
 
+                const mcpSelectedAlt = Number(ac.nav_altitude_mcp);
+                const fmsSelectedAlt = Number(ac.nav_altitude_fms);
+                const selectedAltValue = Number.isFinite(mcpSelectedAlt)
+                    ? mcpSelectedAlt
+                    : fmsSelectedAlt;
+
                 targets.push({
                     id: (ac.hex || ac.icao || 'UNK').trim(),
                     call: ac.flight ? ac.flight.trim() : 'UNK',
                     lat: ac.lat,
                     lon: ac.lon,
                     alt: typeof ac.alt_baro === 'number' ? Math.round(ac.alt_baro) : 0,
+                    selectedAlt: Number.isFinite(selectedAltValue) ? Math.round(selectedAltValue) : null,
                     onGround: onGround,
                     spd: ac.gs ? Math.round(ac.gs) : 0,
                     hdg: ac.track ?? ac.true_heading ?? ac.mag_heading ?? 0,
                     type: ac.t ? ac.t.trim().toUpperCase() : 'UNK',
+                    wake: ac.category ? String(ac.category).trim().toUpperCase() : '',
+                    reg: ac.r ? ac.r.trim().toUpperCase() : '',
+                    country: ac.registered_owner_country_name || '',
+                    operator: ac.ownOp || '',
+                    typeName: ac.desc || '',
+
+
+                    squawk: ac.squawk ? String(ac.squawk).trim() : '',
                     srcType: srcType
                 });
             });
@@ -3134,6 +3634,13 @@
             applyFiltering();
         });
 
+        // Selected altitude datablock toggle
+        document.getElementById('show-selected-altitude').addEventListener('change', function() {
+            Object.keys(aircraftState).forEach(id => {
+                aircraftState[id].lastHTML = null;
+            });
+        });
+
         // Prediction Line Length Slider Observer
         document.getElementById('predict-len-slider').addEventListener('input', function(e) {
             const val = parseFloat(e.target.value);
@@ -3158,7 +3665,7 @@
             'layer-holding': holdingGroup,
             'layer-ground-features': groundFeaturesGroup,
             'layer-sid31': sid31Group,
-            'layer-sid13': sid13lGroup,
+            'layer-sid13': sid13Group,
             'layer-star31': star31Group,
             'layer-star13': star13Group
         };
