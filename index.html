@@ -7,10 +7,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-		<!-- :root { -->
-			<!-- --accent-color: #5DE_B3D; #5DEB3D is the current-->
-			<!-- --accent-rgb: 93, 235, 61; -->
-		<!-- } -->
 		body { margin: 0; background-color: #000; overflow: hidden; }
         #radar-scope { width: 100vw; height: 100vh; background: #080808; }
         
@@ -30,26 +26,6 @@
             letter-spacing: 0px;
             pointer-events: none;
         }
-
-        /* Data Source Status Panels (top-left, stacked) */
-        .radar-source-status-panel {
-            position: absolute;
-            left: 15px;
-            background: rgba(8, 8, 8, 0.4);
-            padding: 4px 6px;
-            z-index: 1000;
-            font-family: 'Google Sans Code', monospace;
-            color: #8A8A8A;
-            font-size: 12px;
-            font-weight: normal;
-            letter-spacing: 0.5px;
-            line-height: 1.5;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-        #radar-airspace-status { top: 15px; }
-        #radar-rain-status { top: 76px; }
-        #radar-metar-status { top: 137px; }
 
         /* METAR Report Panel */
         .radar-metar-panel {
@@ -85,8 +61,6 @@
             font-family: 'Google Sans Code', monospace;
             transition: none;
         }
-        .radar-ui-toggle-btn { display: none; }
-
         .radar-ui-launcher {
             display: flex;
             flex-direction: column;
@@ -123,13 +97,6 @@
             background: #5DEB3D;
             border-color: #5DEB3D;
         }
-        .radar-launch-btn.rwy-pristine {
-            color: #071007;
-            background: #5DEB3D;
-            border-color: #5DEB3D;
-        }
-        .radar-launch-btn.rwy-pristine span { color: #071007; }
-        .radar-launch-btn.rwy-modified { color: #8b948e; }
         .radar-launch-btn span {
             display:block;
             margin-top: 2px;
@@ -264,12 +231,6 @@
             margin:0 9px 0 0;
             cursor:pointer;
         }
-        .radar-slider-container {
-            margin:4px 0;
-            padding:9px 8px 10px;
-            border-radius:8px;
-            background:rgba(255,255,255,.025);
-        }
         .radar-slider-output {
             font-size:11px;
             font-weight:700;
@@ -297,21 +258,6 @@
         .radar-atc-link:hover { border-color:rgba(103,232,90,.28); background:rgba(103,232,90,.045); color:#fff; }
         .radar-atc-link-all { color:#5DEB3D; border-color:rgba(103,232,90,.24); background:rgba(103,232,90,.08); }
 
-        .airspace-legend { display:flex; justify-content:space-between; margin:8px 0 5px; padding:7px 8px; border-radius:7px; background:rgba(255,255,255,.025); color:#59625d; font-size:7px; letter-spacing:.4px; }
-        .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
-        .status-dot.static { background:#aaa; }
-        .status-dot.scheduled { background:#ffc107; }
-        .status-dot.activated { background:#ff3b30; }
-        .airspace-type-header .airspace-type-header-check:nth-child(1) { color:#aaa; }
-        .airspace-type-header .airspace-type-header-check:nth-child(2) { color:#ffc107; }
-        .airspace-type-header .airspace-type-header-check:nth-child(3) { color:#ff3b30; }
-        .airspace-type-row .airspace-type-checks input[type="checkbox"] { width:16px; margin:0; cursor:pointer; }
-        .airspace-type-row .airspace-type-checks input[type="checkbox"]:nth-child(1) { accent-color:#aaa; }
-        .airspace-type-row .airspace-type-checks input[type="checkbox"]:nth-child(2) { accent-color:#ffc107; }
-        .airspace-type-row .airspace-type-checks input[type="checkbox"]:nth-child(3) { accent-color:#ff3b30; }
-        .airspace-type-row .airspace-type-name { font-size:10px; color:#aaa; }
-
-        .radar-dual-slider-fill { background:#5DEB3D; }
         /* ATC Target Label (Datablock) */
         .atc-label {
             color: #5DEB3D;
@@ -474,6 +420,46 @@
         .atc-target-icon.selected {
             box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
         }
+        /* Invisible DOM click target for aircraft selection, replacing a
+           canvas CircleMarker (see aircraftHitAreaIcon in script). Same
+           18px diameter as the previous radius-9 circle. */
+        .aircraft-hit-area-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: transparent;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+        /* aircraftPane's Canvas renderer (speedLine/leaderLine polylines,
+           history dots) paints into one full-viewport <canvas> even where
+           nothing is drawn, and that canvas -- being the topmost DOM
+           element at every point on the map, since aircraftPane sits
+           above airspacePane, waypoint panes, etc. -- silently swallowed
+           mouse events for every layer beneath it, map-wide, not just
+           where an aircraft is actually drawn. pointer-events:none here
+           lets those events fall through; aircraft click/hover still work
+           through real DOM elements (ui.marker, ui.hitArea) inside this
+           same pane, which set their own pointer-events:auto. */
+        #radar-scope .leaflet-aircraft-pane > canvas {
+            pointer-events: none;
+        }
+        /* Same issue, different pane: SID/STAR procedures, runway
+           extension/tick lines, and holding patterns render onto
+           Leaflet's default overlayPane (no explicit pane option), which
+           sits directly above airspacePane (395 vs 400) and also gets a
+           full-viewport canvas. Its content is now interactive:false at
+           the layer level (see sid31Style etc.), but this CSS rule is
+           kept as a second guard so nothing else added to this pane
+           later can silently reintroduce the same block. Nothing in
+           overlayPane needs real pointer events -- waypoint labels are
+           DOM L.marker tooltips (permanent, non-hover) and are
+           unaffected since Leaflet markers never render to canvas. */
+        #radar-scope .leaflet-overlay-pane > canvas {
+            pointer-events: none;
+        }
         /* MLAT-sourced aircraft are shown as a rectangle instead of a
            circle, so the position source is distinguishable at a glance. */
         .atc-target-icon.mlat {
@@ -589,16 +575,6 @@
             background: rgba(255,255,255,.055) !important;
             border-color: rgba(255,255,255,.14) !important;
         }
-        #rwy-direction-btn,
-        #rwy-direction-btn.rwy-pristine,
-        #rwy-direction-btn.modified {
-            color: #b8c0bb !important;
-            background: rgba(255,255,255,.035) !important;
-            border-color: rgba(255,255,255,.10) !important;
-        }
-        #rwy-direction-btn span {
-            color: #8c9690 !important;
-        }
 
 
         /* Explicit ON/OFF controls replace ordinary checkboxes */
@@ -653,8 +629,9 @@
         }
 
 
-        /* View presets and runway direction are neutral controls.
-           They should never use the green active-state treatment. */
+        /* View presets and runway direction are neutral controls, not
+           status indicators: they never use the green active-state
+           treatment that other launch buttons get. */
         .radar-launch-btn[data-view-preset],
         .radar-launch-btn[data-view-preset].active,
         #rwy-direction-btn,
@@ -677,64 +654,6 @@
         }
 
 
-        /* Runway toggle: neutral at rest, brief tactile feedback on click */
-        #rwy-direction-btn,
-        #rwy-direction-btn.rwy-pristine,
-        #rwy-direction-btn.modified,
-        #rwy-direction-btn.active {
-            color:#b8c0bb !important;
-            background:rgba(255,255,255,.035) !important;
-            border-color:rgba(255,255,255,.10) !important;
-            box-shadow:none !important;
-            transform:none !important;
-        }
-        #rwy-direction-btn.rwy-clicked {
-            color:#e8eee9 !important;
-            background:rgba(255,255,255,.12) !important;
-            border-color:rgba(255,255,255,.26) !important;
-            box-shadow:0 0 0 2px rgba(255,255,255,.035) !important;
-            transform:scale(.96) !important;
-            transition:none !important;
-        }
-        #rwy-direction-btn span {
-            color:#8c9690 !important;
-        }
-
-
-        /* FINAL RUNWAY OVERRIDE
-           Runway direction is a neutral toggle; only click feedback may brighten it. */
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn,
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.rwy-pristine,
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.modified,
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.active {
-            background: rgba(255,255,255,.035) !important;
-            background-color: rgba(255,255,255,.035) !important;
-            color: #b8c0bb !important;
-            border: 1px solid rgba(255,255,255,.10) !important;
-            border-color: rgba(255,255,255,.10) !important;
-            box-shadow: none !important;
-            outline: none !important;
-        }
-
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn:hover {
-            background: rgba(255,255,255,.07) !important;
-            background-color: rgba(255,255,255,.07) !important;
-            color: #e2e7e4 !important;
-            border-color: rgba(255,255,255,.18) !important;
-        }
-
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn.rwy-clicked {
-            background: rgba(255,255,255,.12) !important;
-            background-color: rgba(255,255,255,.12) !important;
-            color: #f0f4f1 !important;
-            border-color: rgba(255,255,255,.26) !important;
-        }
-
-        html body .radar-ui-launcher .radar-launch-btn#rwy-direction-btn span {
-            color: #8c9690 !important;
-        }
-
-
         /* Airspace status matrix: TYPE | Static | Scheduled | Active */
         .airspace-type-header,
         .airspace-type-row {
@@ -751,9 +670,6 @@
             letter-spacing:.5px;
         }
         .airspace-type-header-check { text-align:center; font-weight:700; }
-        .airspace-type-header-check.static-h { color:#aaa; }
-        .airspace-type-header-check.scheduled-h { color:#ffc107; }
-        .airspace-type-header-check.activated-h { color:#ff3b30; }
         .airspace-type-row {
             min-height:28px;
             padding:2px 5px;
@@ -871,24 +787,37 @@
             white-space: nowrap;
             text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.95);
         }
-        .leaflet-tooltip.airspace-tooltip {
-            background: rgba(10, 14, 18, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.25);
+        .leaflet-tooltip.airspace-info-tooltip {
+            background: rgba(10, 14, 18, 0.94) !important;
             color: #E0F7FF;
             font-family: 'Google Sans Code', monospace;
-            font-size: 12px;
+            font-size: 11px;
             line-height: 1.4;
-            padding: 4px 7px;
-            box-shadow: none;
+            padding: 6px 8px;
+            max-width: 260px;
         }
-        .leaflet-tooltip.airspace-tooltip::before {
+        .leaflet-tooltip.airspace-info-tooltip::before {
             display: none;
+        }
+        .airspace-info-entry + .airspace-info-entry {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .airspace-info-entry-name {
+            font-weight: 700;
+            color: #E0F7FF;
+        }
+        .airspace-info-entry-row {
+            color: #aeb6b1;
+        }
+        .airspace-info-entry-row b {
+            color: #E0F7FF;
+            font-weight: normal;
         }
         .lara-fua-label-icon {
             background: transparent !important;
             border: none !important;
-        }
-        .lara-fua-label-icon {
             width: max-content !important;
             height: max-content !important;
         }
@@ -952,16 +881,6 @@
         }
 
 
-        .leaflet-tooltip {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-        }
-        .leaflet-tooltip:before {
-            display: none !important;
-        }
-        
-
         /* Waypoint Alphanumeric Text Styling */
         .fix-label {
             color: #8A8A8A;
@@ -979,19 +898,6 @@
                  0 0 3px rgba(0,0,0,0.95);
         }
 
-
-
-        /* Source/update information now belongs to its relevant settings panel */
-        .radar-source-panel-status {
-            margin: -2px 0 10px;
-            padding: 7px 8px;
-            border-bottom: 1px solid rgba(255,255,255,.07);
-            color: #68716c;
-            font-family: 'Google Sans Code', monospace;
-            font-size: 9px;
-            line-height: 1.45;
-            letter-spacing: .15px;
-        }
 
 
         /* Panel source/status information lives at the bottom */
@@ -1035,11 +941,11 @@
         }
 
 
-        /* Sliders use the same flat option background as the other controls.
-           Remove the distinct rounded slider-card treatment. */
+        /* Sliders use the same flat option background as the other controls,
+           with padding matched to the regular option controls. */
         .radar-slider-container {
             margin: 2px 0 !important;
-            padding: 0 8px !important;
+            padding: 6px 8px !important;
             min-height: 34px;
             box-sizing: border-box;
             border-radius: 0 !important;
@@ -1050,17 +956,9 @@
             justify-content: center;
         }
 
-        .radar-slider-container .radar-ui-section {
-            margin: 0 0 2px 0 !important;
-        }
-
-        .radar-slider-container .radar-slider-output {
-            margin-bottom: 2px !important;
-        }
-
-
         /* Slider titles match regular option text. */
         .radar-slider-container .radar-ui-section {
+            margin: 0 0 2px 0 !important;
             color: #aeb6b1 !important;
             font-family: 'Google Sans Code', monospace !important;
             font-size: 11px !important;
@@ -1069,17 +967,8 @@
             text-transform: none !important;
         }
 
-
-        /* Match slider container padding to the regular option controls. */
-        .radar-slider-container {
-            padding: 2px 8px !important;
-        }
-
-
-        /* Increase only the vertical slider padding, keeping horizontal
-           padding aligned with the other options. */
-        .radar-slider-container {
-            padding: 6px 8px !important;
+        .radar-slider-container .radar-slider-output {
+            margin-bottom: 2px !important;
         }
 
 
@@ -1256,11 +1145,12 @@
 
             <div class="radar-panel-heading"><span>AIRSPACES</span><button type="button" class="radar-panel-close">×</button></div>
             <button type="button" class="radar-onoff-control" data-checkbox-id="layer-airspace-all"><span>SHOW AIRSPACES</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-airspace-all" class="radar-hidden-checkbox" checked>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="airspace-info-toggle"><span>AIRSPACE INFO</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="airspace-info-toggle" class="radar-hidden-checkbox">
             <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">FLOOR RANGE</div><div class="radar-slider-output" id="airspace-floor-filter-val">SFC – UNL</div><div class="radar-dual-slider"><div class="radar-dual-slider-track"></div><div class="radar-dual-slider-fill" id="airspace-floor-filter-fill"></div><input type="range" id="airspace-floor-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0"><input type="range" id="airspace-floor-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600"></div></div>
             <div class="radar-slider-container"><div class="radar-ui-section" style="margin:0 0 2px 0">CEILING RANGE</div><div class="radar-slider-output" id="airspace-ceiling-filter-val">SFC – UNL</div><div class="radar-dual-slider"><div class="radar-dual-slider-track"></div><div class="radar-dual-slider-fill" id="airspace-ceiling-filter-fill"></div><input type="range" id="airspace-ceiling-filter-low" class="radar-ui-slider" min="0" max="600" step="5" value="0"><input type="range" id="airspace-ceiling-filter-high" class="radar-ui-slider" min="0" max="600" step="5" value="600"></div></div>
             <div class="radar-ui-section airspace-status-subtitle">STATUS VISIBILITY</div>
             
-            <div class="radar-view-btn-row" style="margin-top:8px"><button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn airspace-static-toggle" class="radar-reset-btn" title="Toggle all Static">STATIC</button><button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn airspace-scheduled-toggle" class="radar-reset-btn" title="Toggle all Scheduled">SCHEDULED</button><button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn airspace-active-toggle" class="radar-reset-btn" title="Toggle all Active">ACTIVE</button></div>
+            <div class="radar-view-btn-row" style="margin-top:8px"><button type="button" id="airspace-toggle-static-btn" class="radar-reset-btn airspace-static-toggle" title="Toggle all Static">STATIC</button><button type="button" id="airspace-toggle-scheduled-btn" class="radar-reset-btn airspace-scheduled-toggle" title="Toggle all Published">PUBLISHED</button><button type="button" id="airspace-toggle-activated-btn" class="radar-reset-btn airspace-active-toggle" title="Toggle all Activated">ACTIVATED</button></div>
             <div id="airspace-type-filters"></div>
         
             <div class="radar-source-panel-status" id="radar-airspace-status">
@@ -1617,9 +1507,6 @@
             return callsign;
         }
 
-        // Global State Variable for Telephony Toggle
-        let useLongCallsign = false;
-
         // 1. Initialize map centered on Budapest Airport (LHBP)
         const INITIAL_VIEW_CENTER = [47.4369, 19.2556];
         // View presets, by zoom level: APP (approach/TMA-scale overview) <
@@ -1652,8 +1539,10 @@
         //   < taxiwayLinesPane (380) < runwayLinesPane (390) < overlayPane (400, default:
         //   waypoints/SID-STAR/airspaces/etc.) < ... < markerPane (600, default) <
         //   tooltipPane (650, default) < aircraftPane (700, traffic: position dots,
-        //   speed vectors, leader lines, data blocks, history trail dots -- always on
-        //   top of every other layer, regardless of add order).
+        //   speed vectors, leader lines, data blocks, history trail dots) <
+        //   datablockPane (710) < airspaceInfoTooltipPane (720, AIRSPACE INFO's
+        //   combined hover tooltip -- always on top of every other layer,
+        //   including aircraft, regardless of add order).
         map.createPane('apronsPane');
         map.getPane('apronsPane').style.zIndex = 340;
         map.createPane('taxiwaysFillPane');
@@ -1673,8 +1562,20 @@
         map.createPane('airspaceLabelPane');
         map.getPane('airspaceLabelPane').style.zIndex = 395;
 
+
         map.createPane('aircraftPane');
         map.getPane('aircraftPane').style.zIndex = 700;
+        // aircraftPane's Canvas renderer draws a full-viewport <canvas>
+        // even where nothing is drawn, and that canvas was the topmost
+        // element under the cursor everywhere on the map (aircraftPane
+        // sits above every other pane, incl. airspacePane at 395),
+        // silently swallowing all mouse events -- including airspace
+        // hover -- map-wide, even far from any aircraft. The
+        // .leaflet-aircraft-pane canvas rule in the stylesheet sets
+        // pointer-events:none so events fall through to panes below;
+        // aircraft interaction still works because it goes through real
+        // DOM elements (ui.marker, ui.hitArea -- see aircraftHitAreaIcon)
+        // which set pointer-events:auto on themselves individually.
 
         // Leaflet's Canvas renderer (used because the map runs with
         // preferCanvas: true) draws every non-explicitly-rendered vector
@@ -1688,6 +1589,16 @@
         // traffic canvas (hitArea circles, speed/leader lines, history dots).
         map.createPane('datablockPane');
         map.getPane('datablockPane').style.zIndex = 710;
+
+        // AIRSPACE INFO's combined hover tooltip (see AirspaceManager's
+        // hover engine) needs to sit above aircraft and datablocks -- a
+        // tooltip explaining what's under the cursor is only useful if
+        // it isn't itself hidden behind the traffic it's next to.
+        // Leaflet's default tooltipPane (650) sits below aircraftPane
+        // (700) and datablockPane (710), so this gets its own pane above
+        // both instead of using the default.
+        map.createPane('airspaceInfoTooltipPane');
+        map.getPane('airspaceInfoTooltipPane').style.zIndex = 720;
 
         // Editor-mode label pane, created here (before any markers try to
         // use it) rather than inside initLabelEditor(), since that isn't
@@ -1720,7 +1631,7 @@
         // RainViewer Precipitation Radar Overlay
         // ==========================================
         // RainViewer publishes a new radar frame every 10 minutes. We poll
-        // slightly more often than that (every 3 min) so a new frame is
+        // slightly more often than that (every 1 min) so a new frame is
         // picked up promptly after it's published, but we only actually
         // swap the tile layer when the frame timestamp has changed, so we
         // don't reload identical tiles in between.
@@ -1823,15 +1734,20 @@
 
         // Monochromatic Layer Configurations
         const runwayStyle = { color: '#ffffff', weight: 4, opacity: 0.9 };
-        const extensionStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6 };
-        const tickLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6 };
-        const majorTickLineStyle = { color: '#ffffff', weight: 2, opacity: 0.8 };
+        // interactive:false on these -- decorative only (no click/hover/
+        // tooltip ever bound). Left interactive by default they sit in
+        // Leaflet's default overlayPane, whose full-viewport canvas then
+        // blocks airspace hover map-wide, same as aircraftPane did (see
+        // CSS/pane comments near aircraftPane's creation).
+        const extensionStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6, interactive: false };
+        const tickLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6, interactive: false };
+        const majorTickLineStyle = { color: '#ffffff', weight: 2, opacity: 0.8, interactive: false };
         
-        const sid31Style = { color: '#ffffff', weight: 1.5, dashArray: '6, 4', opacity: 0.6 };
-        const sid13Style = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7 };
-        const star31Style = { color: '#ffffff', weight: 1.5, dashArray: '10, 4, 2, 4', opacity: 0.6 };
-        const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5 };
-        const holdingStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4 };
+        const sid31Style = { color: '#ffffff', weight: 1.5, dashArray: '6, 4', opacity: 0.6, interactive: false };
+        const sid13Style = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7, interactive: false };
+        const star31Style = { color: '#ffffff', weight: 1.5, dashArray: '10, 4, 2, 4', opacity: 0.6, interactive: false };
+        const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5, interactive: false };
+        const holdingStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4, interactive: false };
 
         // Airspace boundary styles. Preserves the existing visual language
         // (red outlines for the highest-significance categories, neutral
@@ -1857,6 +1773,54 @@
         // into or replacing the underlying static airspace's own style.
         const laraFuaPublishedStyle = { color: '#FFC107', weight: 1, opacity: 1, fill: true, fillColor: '#FFC107', fillOpacity: 0.05 };
         const laraFuaActiveStyle = { color: '#FF3B30', weight: 1, opacity: 1, fill: true, fillColor: '#FF3B30', fillOpacity: 0.1 };
+
+        // Per-type hover highlight colors (AIRSPACE INFO, see
+        // AirspaceManager's hover engine). Keyed by the exact `type`
+        // values PilotNet's own TYPE list uses (confirmed against the
+        // live filter panel): COUNTRY_CTA, CTA, CTR, D, DRONE_ZONE,
+        // DROPZONE, GLDR, MCTR, MTMA, "NATURE RESERVE AREA", P, R, RAS,
+        // TIZ, TMA, TRA, plus ADHOC for unmatched LARA_FUA-only records
+        // (see LARA_FUA_TYPE). Distinct hue per type so hovering over a
+        // stack of overlapping airspaces visually separates them at a
+        // glance; falls back to airspaceHoverDefaultColor for any type
+        // not listed here (e.g. a new type PilotNet starts sending).
+        const airspaceHoverColorByType = {
+            'NATURE RESERVE AREA': '#4CAF50', // green
+            'TRA': '#FF9800',                 // orange
+            'D': '#E91E63',                   // pink
+            'TMA': '#2196F3',                 // blue
+            'GLDR': '#1DE9B6',                // turquoise
+            'DROPZONE': '#9C27B0',            // purple
+            'CTR': '#FFEB3B',                 // yellow
+            'CTA': '#03A9F4',                 // light blue
+            'COUNTRY_CTA': '#3F51B5',         // indigo
+            'MTMA': '#00BCD4',                // cyan
+            'MCTR': '#CDDC39',                // lime
+            'TIZ': '#FF5722',                 // deep orange
+            'RAS': '#8BC34A',                 // light green
+            'DRONE_ZONE': '#F44336',          // red
+            'P': '#D32F2F',                   // dark red (Prohibited)
+            'R': '#C62828',                   // dark red (Restricted)
+            // Keyed by the LARA_FUA_TYPE constant's actual value
+            // ('LARA_FUA'), not the "ADHOC" display label used for it in
+            // buildAirspaceInfoEntryHTML/renderTypeFilterUI -- entry.type
+            // for an unmatched LARA_FUA-only record is 'LARA_FUA' (see
+            // getStaticType), so keying this by the string 'ADHOC' would
+            // never actually match and would silently fall back to the
+            // default color.
+            'LARA_FUA': '#B39DDB',            // light purple
+        };
+        const airspaceHoverDefaultColor = '#E0E0E0';
+
+        // Applied on top of a hovered airspace's normal style (see
+        // AirspaceManager's hover engine) when AIRSPACE INFO is on.
+        // Color varies by type (see airspaceHoverColorByType) so a stack
+        // of overlapping airspaces is visually distinguishable at a
+        // glance; weight/opacity/fill stay fixed across types.
+        function airspaceHoverStyleForType(type) {
+            const color = airspaceHoverColorByType[type] || airspaceHoverDefaultColor;
+            return { color, weight: 2.5, opacity: 1, fill: true, fillColor: color, fillOpacity: 0.15 };
+        }
 
         const taxiwayStyle = { stroke: false, fillColor: '#2B2B2B', fillOpacity: 1, pane: 'taxiwaysFillPane' };
         const apronStyle = { stroke: false, fillColor: '#242424', fillOpacity: 1, pane: 'apronsPane' };
@@ -2452,7 +2416,14 @@
             }
 
             Object.keys(waypoints).forEach(fixName => {
-                const marker = L.marker(waypoints[fixName], { icon: triangleIcon })
+                // interactive:false -- these triangle markers have never
+                // had any click/hover behavior bound to them (bindEditableLabel
+                // creates its own separate, draggable labelMarker and never
+                // reads this one back). They were only clickable because
+                // overlayPane's canvas above them silently absorbed clicks
+                // before they could reach any layer; now that that canvas
+                // passes events through, this default needs to be explicit.
+                const marker = L.marker(waypoints[fixName], { icon: triangleIcon, interactive: false })
                  .addTo(waypointsGroup);
 
                 if (EDITOR_MODE) {
@@ -2757,6 +2728,13 @@
         document.querySelector('.radar-ui-panel[data-panel-view="aircraft"]').appendChild(trafficStatusEl);
 
         const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [11, 11] });
+        // Real DOM hit target for aircraft click selection (see hitArea
+        // below). Kept as an L.marker rather than a canvas CircleMarker so
+        // it isn't rendered into aircraftPane's full-viewport canvas --
+        // that canvas has pointer-events:none (see CSS) so airspace hover
+        // beneath it isn't blocked map-wide; a canvas-based hit target
+        // would have been invisible to the browser's hit-test entirely.
+        const aircraftHitAreaIcon = L.divIcon({ className: 'aircraft-hit-area-icon', iconSize: [18, 18] });
 
         function setTrafficSource(source, statusText, siteDomain) {
             trafficSource = source;
@@ -3182,7 +3160,7 @@
                 featureGroup: L.featureGroup().addTo(trafficGroup),
                 ui: {
                     marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0, pane: 'aircraftPane' }),
-                    hitArea: L.circleMarker([0, 0], { radius: 9, opacity: 0, fillOpacity: 0, interactive: true, bubblingMouseEvents: false, pane: 'aircraftPane' }),
+                    hitArea: L.marker([0, 0], { icon: aircraftHitAreaIcon, interactive: true, bubblingMouseEvents: false, opacity: 0, pane: 'aircraftPane' }),
                     speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 1, interactive: false, pane: 'aircraftPane' }),
                     leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.5, opacity: 1, interactive: false, pane: 'aircraftPane' }),
                     dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0, pane: 'datablockPane' })
@@ -3760,11 +3738,6 @@
         document.getElementById('filter-waypoints-7xx').addEventListener('change', updateWaypointFilters);
         document.getElementById('filter-waypoints-8xx').addEventListener('change', updateWaypointFilters);
 
-        // Telephony Format Toggle Event Listener
-        document.getElementById('callsign-format-long').addEventListener('change', function(e) {
-            useLongCallsign = e.target.checked;
-        });
-
         // Input Engine Hooks monitoring search field typing events (Real-time tracking of FIX labels)
         document.getElementById('radar-search').addEventListener('input', function(e) {
             if (EDITOR_MODE) return; // labels aren't tooltips in editor mode
@@ -3967,8 +3940,9 @@
         //     style substitution on the one polygon, not a second overlay.
         //   - LARA_FUA only (no static match): treated as ADHOC. Still
         //     drawn through the same pipeline, filed under its own
-        //     LARA_FUA_TYPE bucket, filtered by the SHOW ADHOC checkbox
-        //     instead of the per-type checkboxes.
+        //     LARA_FUA_TYPE bucket, filtered by its own STATIC/SCHEDULED/
+        //     ACTIVATED row in the type filter matrix instead of a
+        //     dedicated ADHOC checkbox.
         // Polls every 5 minutes; on each refresh only the airspaces that
         // actually changed (added/removed/geometry/activation) are
         // touched -- nothing is blindly redrawn.
@@ -4055,13 +4029,13 @@
             // A record's floor/ceiling for filtering purposes, in feet.
             // Pulled from the same static (non-LARA_FUA) types[] entry
             // used elsewhere for height display (see buildPermanentLabelHTML
-            // /buildTooltipHTML); ADHOC records (no static entry, only a
-            // LARA_FUA band) fall back to their LARA_FUA entry's own
-            // heightFrom/heightTo, same as buildTooltipHTML does. Missing
-            // floor defaults to the surface (0); missing/non-finite
-            // ceiling defaults to UNBOUNDED_CEILING (UNL) rather than 0,
-            // so an airspace with no stated top isn't filtered out by a
-            // low Ceiling Range setting.
+            // /getTooltipAltitudeBand); ADHOC records (no static entry,
+            // only a LARA_FUA band) fall back to their LARA_FUA entry's
+            // own heightFrom/heightTo, same as getTooltipAltitudeBand
+            // does. Missing floor defaults to the surface (0);
+            // missing/non-finite ceiling defaults to UNBOUNDED_CEILING
+            // (UNL) rather than 0, so an airspace with no stated top
+            // isn't filtered out by a low Ceiling Range setting.
             function getAltitudeBand(record) {
                 const types = Array.isArray(record?.types) ? record.types : [];
                 const staticEntry = types.find(t =>
@@ -4168,8 +4142,9 @@
             // P and R are flagged active unconditionally, independent of
             // any real LARA_FUA data on the record, so they flow through
             // the same styleForAirspace highlight/fallback logic as a
-            // matched LARA_FUA record -- SHOW ACTIVATED off drops them
-            // back to their own default style, same as everything else.
+            // matched LARA_FUA record -- turning ACTIVATED off for that
+            // type in the filter matrix drops them back to their own
+            // default style, same as everything else.
             function isActive(record) {
                 const type = getStaticType(record);
                 if (type === 'P' || type === 'R') return true;
@@ -4235,28 +4210,116 @@
                 return `${coordsKey}|${typesKey}|${record.name || ''}`;
             }
 
-            function buildTooltipHTML(record) {
+            // ---- AIRSPACE INFO (multi-airspace hover tooltip) --------------
+            //
+            // Everything below supports the AIRSPACE INFO toggle. Layers
+            // themselves have no bound tooltip at all (see renderAirspace)
+            // -- this builds one entry per record and the hover engine
+            // (see initHoverInfo) concatenates every currently-hovered,
+            // visible record -- including whichever ones are stacked
+            // underneath the topmost polygon -- into a single combined
+            // tooltip, shown only while the AIRSPACE INFO checkbox is on.
+
+            // Human-readable status label + color. Plain static airspace
+            // with no LARA_FUA involvement at all reports STATIC in the
+            // same neutral gray used for its own outline.
+            function getStatusInfo(record, type) {
+                if (type !== 'P' && type !== 'R' && isPublished(record)) {
+                    return isActive(record)
+                        ? { label: 'ACTIVATED', color: '#FF3B30' }
+                        : { label: 'PUBLISHED', color: '#FFC107' };
+                }
+                return { label: 'STATIC', color: '#9E9E9E' };
+            }
+
+            // Formats a LARA_FUA entry's fromDate/toDate as a validity
+            // range. Both fields are ISO timestamps with a local offset
+            // (see formatLaraFuaTime); displayed in UTC as DD.MM HH:MM.
+            // The end date is abbreviated to just HH:MM when it falls on
+            // the same UTC day as the start, since that's the common case
+            // for same-day LARA/FUA reservations.
+            function formatValidityRange(fromValue, toValue) {
+                if (!fromValue && !toValue) return null;
+                const fromDate = fromValue ? new Date(fromValue) : null;
+                const toDate = toValue ? new Date(toValue) : null;
+                const validFrom = fromDate && !Number.isNaN(fromDate.getTime());
+                const validTo = toDate && !Number.isNaN(toDate.getTime());
+                if (!validFrom && !validTo) return null;
+
+                const fmt = (d) => {
+                    const day = String(d.getUTCDate()).padStart(2, '0');
+                    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const hours = String(d.getUTCHours()).padStart(2, '0');
+                    const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+                    return { date: `${day}.${month}`, time: `${hours}:${minutes}` };
+                };
+
+                if (!validFrom) { const t = fmt(toDate); return `until ${t.date} ${t.time}Z`; }
+                if (!validTo) { const f = fmt(fromDate); return `from ${f.date} ${f.time}Z`; }
+
+                const f = fmt(fromDate);
+                const t = fmt(toDate);
+                return f.date === t.date
+                    ? `${f.date} ${f.time} - ${t.time}Z`
+                    : `${f.date} ${f.time}Z - ${t.date} ${t.time}Z`;
+            }
+
+            // Floor/ceiling for the tooltip, in the app's existing
+            // FL-style display convention (see buildPermanentLabelHTML's
+            // formatPermanentAlt): the record's own top-level lower/upper
+            // fields don't exist on real PilotNet records (confirmed by
+            // getAltitudeBand, which reads heightFrom/heightTo off
+            // types[] instead) -- reading them here always fell through
+            // to '?'. Pulls the static (non-LARA_FUA) types[] entry's
+            // heightFrom/heightTo first, matching getAltitudeBand's own
+            // priority, falling back to the LARA_FUA entry's own
+            // heightFrom/heightTo for adhoc records with no static entry.
+            function formatTooltipAltitude(value, fallback) {
+                if (value === null || value === undefined || value === '') return fallback;
+                const n = Number(value);
+                if (!Number.isFinite(n)) return String(value);
+                if (n <= 0) return 'SFC';
+                return `FL${String(Math.round(n / 100)).padStart(3, '0')}`;
+            }
+
+            function getTooltipAltitudeBand(record, laraEntry) {
+                const staticEntry = Array.isArray(record?.types)
+                    ? record.types.find(t => t && t.type !== LARA_FUA_TYPE && (t.heightFrom !== undefined || t.heightTo !== undefined))
+                    : null;
+                const entry = staticEntry || laraEntry;
+                const lower = formatTooltipAltitude(entry?.heightFrom, 'SFC');
+                const upper = formatTooltipAltitude(entry?.heightTo, 'UNL');
+                return { lower, upper };
+            }
+
+            // One record's block of HTML inside the combined tooltip:
+            // name, model (the record's airspace type/class, e.g. CTR,
+            // TMA, D -- there is no separate "model" field in the
+            // PilotNet data, this is the same classification already
+            // shown elsewhere as e.g. "(CTR)"), status, floor/ceiling,
+            // and validity (only present for records carrying a real
+            // LARA_FUA entry -- plain static airspace has no validity
+            // window to show).
+            function buildAirspaceInfoEntryHTML(record) {
                 const name = record.name || 'AIRSPACE';
                 const type = getStaticType(record);
-                // Adhoc records (no static classification, only a LARA_FUA
-                // entry) have no meaningful lower/upper on the record
-                // itself -- fall back to the LARA_FUA entry's own limits.
                 const isAdhoc = type === LARA_FUA_TYPE;
-                const laraEntry = isAdhoc ? getLaraFuaEntry(record) : null;
-                const lower = record.lower || record.lowerLimit || laraEntry?.heightFrom || '?';
-                const upper = record.upper || record.upperLimit || laraEntry?.heightTo || '?';
-                const typeLabel = isAdhoc ? 'ADHOC' : type;
-                let html = `${name}${typeLabel ? ` (${typeLabel})` : ''}<br>${lower} - ${upper}`;
-                // The LARA/FUA status line only applies to records with a
-                // genuine LARA_FUA entry -- P and R are flagged
-                // isPublished/isActive for styling purposes only (see
-                // isPublished/isActive), they don't carry a real LARA_FUA
-                // reservation, so they're excluded here.
-                if (type !== 'P' && type !== 'R' && isPublished(record)) {
-                    const color = isActive(record) ? '#FF3B30' : '#FFC107';
-                    const status = isActive(record) ? 'ACTIVE' : 'PUBLISHED';
-                    html += `<br><span style="color:${color};">LARA/FUA ${status}</span>`;
+                const laraEntry = getLaraFuaEntry(record);
+                const modelLabel = isAdhoc ? 'ADHOC' : type;
+                const modelColor = airspaceHoverColorByType[type] || airspaceHoverDefaultColor;
+                const { lower, upper } = getTooltipAltitudeBand(record, laraEntry);
+                const status = getStatusInfo(record, type);
+                const validity = laraEntry ? formatValidityRange(laraEntry.fromDate, laraEntry.toDate) : null;
+
+                let html = `<div class="airspace-info-entry">`;
+                html += `<div class="airspace-info-entry-name">${name}</div>`;
+                html += `<div class="airspace-info-entry-row">MODEL: <b style="color:${modelColor};">${modelLabel}</b></div>`;
+                html += `<div class="airspace-info-entry-row">STATUS: <b style="color:${status.color};">${status.label}</b></div>`;
+                html += `<div class="airspace-info-entry-row">FLOOR/CEIL: <b>${lower} - ${upper}</b></div>`;
+                if (validity) {
+                    html += `<div class="airspace-info-entry-row">VALID: <b>${validity}</b></div>`;
                 }
+                html += `</div>`;
                 return html;
             }
 
@@ -4267,6 +4330,73 @@
             // pairs (confirmed against live API data), so no axis-order
             // conversion is needed. No GeoJSON handling here at all --
             // record.geometry is never referenced by this subsystem.
+            // Computes the polygon centroid (area-weighted, not the
+            // vertex average) so labels sit at the visual "middle" of
+            // the shape rather than the bounding-box center, which for
+            // L-shaped/concave airspace can land outside the polygon.
+            // Accepts either a single ring [[lat,lon],...] or multiple
+            // rings [[[lat,lon],...],...]; with multiple rings, the
+            // outer boundary is taken to be the ring with the largest
+            // |area| and any remaining rings are treated as holes and
+            // subtracted, matching standard polygon-with-holes
+            // semantics. Falls back to the plain vertex average for
+            // degenerate (near-zero-area, e.g. a straight line or a
+            // single point) rings.
+            function ringCentroidAndArea(ring) {
+                let area = 0, cx = 0, cy = 0;
+                const n = ring.length;
+                for (let i = 0; i < n; i++) {
+                    const [x1, y1] = ring[i];
+                    const [x2, y2] = ring[(i + 1) % n];
+                    const cross = x1 * y2 - x2 * y1;
+                    area += cross;
+                    cx += (x1 + x2) * cross;
+                    cy += (y1 + y2) * cross;
+                }
+                area = area / 2;
+                if (Math.abs(area) < 1e-12) return null;
+                return { area, cx: cx / (6 * area), cy: cy / (6 * area) };
+            }
+
+            function polygonCentroid(latlngs) {
+                const isMultiRing = Array.isArray(latlngs[0][0]);
+                const rings = isMultiRing ? latlngs : [latlngs];
+
+                const solved = rings.map(ringCentroidAndArea);
+                const outerIdx = solved.reduce((best, r, i) => {
+                    if (!r) return best;
+                    if (best === -1 || Math.abs(r.area) > Math.abs(solved[best].area)) return i;
+                    return best;
+                }, -1);
+
+                if (outerIdx === -1) {
+                    // Every ring is degenerate: fall back to averaging
+                    // every vertex across every ring.
+                    const flat = rings.flat();
+                    const sum = flat.reduce((acc, [lat, lon]) => [acc[0] + lat, acc[1] + lon], [0, 0]);
+                    return [sum[0] / flat.length, sum[1] / flat.length];
+                }
+
+                // Composite centroid of the outer ring with holes
+                // subtracted (holes contribute negative area/moment).
+                let totalArea = solved[outerIdx].area;
+                let mx = solved[outerIdx].cx * solved[outerIdx].area;
+                let my = solved[outerIdx].cy * solved[outerIdx].area;
+
+                rings.forEach((ring, i) => {
+                    if (i === outerIdx || !solved[i]) return;
+                    const holeArea = -Math.abs(solved[i].area);
+                    totalArea += holeArea;
+                    mx += solved[i].cx * holeArea;
+                    my += solved[i].cy * holeArea;
+                });
+
+                if (Math.abs(totalArea) < 1e-12) {
+                    return [solved[outerIdx].cx, solved[outerIdx].cy];
+                }
+                return [mx / totalArea, my / totalArea];
+            }
+
             function extractLatLngs(record) {
                 const coords = record?.coordinates;
                 if (!Array.isArray(coords) || coords.length === 0) return null;
@@ -4278,6 +4408,49 @@
 
                 // Multiple rings: [[[lat,lon],...], [[lat,lon],...]]
                 return coords.map(ring => ring.map(([lat, lon]) => [lat, lon]));
+            }
+
+            // Standard ray-casting point-in-ring test (even-odd rule).
+            // [lat, lon] pairs throughout, matching extractLatLngs --
+            // the axes are only ever used relative to each other here,
+            // so lat/lon vs x/y doesn't matter as long as both the ring
+            // and the point use the same convention.
+            function pointInRing(lat, lon, ring) {
+                let inside = false;
+                for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                    const [latI, lonI] = ring[i];
+                    const [latJ, lonJ] = ring[j];
+                    const intersects = ((lonI > lon) !== (lonJ > lon)) &&
+                        (lat < (latJ - latI) * (lon - lonI) / (lonJ - lonI) + latI);
+                    if (intersects) inside = !inside;
+                }
+                return inside;
+            }
+
+            // True if [lat, lon] falls inside the polygon described by
+            // latlngs -- the same single-ring-or-multi-ring shape
+            // extractLatLngs produces. With multiple rings, a point
+            // counts as inside only if it's inside the largest-area
+            // (outer) ring and NOT inside any other ring (holes),
+            // mirroring the outer/hole split polygonCentroid uses.
+            function pointInAirspacePolygon(lat, lon, latlngs) {
+                if (!latlngs || latlngs.length === 0) return false;
+                const isMultiRing = Array.isArray(latlngs[0][0]);
+                if (!isMultiRing) return pointInRing(lat, lon, latlngs);
+
+                const rings = latlngs;
+                const areas = rings.map(ring => {
+                    const solved = ringCentroidAndArea(ring);
+                    return solved ? Math.abs(solved.area) : 0;
+                });
+                const outerIdx = areas.reduce((best, a, i) => a > areas[best] ? i : best, 0);
+
+                if (!pointInRing(lat, lon, rings[outerIdx])) return false;
+                for (let i = 0; i < rings.length; i++) {
+                    if (i === outerIdx) continue;
+                    if (pointInRing(lat, lon, rings[i])) return false;
+                }
+                return true;
             }
 
             // ---- Normal airspace rendering (add / update in place / remove) ----
@@ -4385,10 +4558,10 @@
 
                 if (existing && existing.signature === signature) {
                     // Nothing that affects the drawn polygon changed --
-                    // still refresh the tooltip in case display-only
-                    // fields changed, but skip touching the layer/style.
+                    // just refresh the stored record so the AIRSPACE INFO
+                    // tooltip picks up any display-only field changes on
+                    // its next hover; skip touching the layer/style.
                     existing.record = record;
-                    existing.layer.setTooltipContent(buildTooltipHTML(record));
                     return;
                 }
 
@@ -4406,10 +4579,10 @@
                     // rather than removing and recreating it.
                     existing.layer.setLatLngs(latlngs);
                     existing.layer.setStyle(style);
-                    existing.layer.setTooltipContent(buildTooltipHTML(record));
+                    existing.latlngs = latlngs;
 
                     if (needsLabel(record, type)) {
-                        const center = existing.layer.getBounds().getCenter();
+                        const center = polygonCentroid(latlngs);
                         if (existing.label) {
                             existing.label.setLatLng(center);
                             existing.label.setIcon(L.divIcon({
@@ -4449,18 +4622,23 @@
                     return;
                 }
 
-                // New airspace: create once.
+                // New airspace: create once. No tooltip is bound directly
+                // to the layer -- all airspace tooltips go through the
+                // AIRSPACE INFO combined system (see initHoverInfo),
+                // which is the only thing that can show every stacked
+                // airspace at a point rather than just the topmost one,
+                // and which is itself gated entirely by the AIRSPACE INFO
+                // checkbox so no tooltip appears until that's turned on.
                 const layer = L.polygon(latlngs, {
                     ...style,
                     pane: 'airspacePane'
                 });
-                layer.bindTooltip(buildTooltipHTML(record), { sticky: true, className: 'airspace-tooltip' });
 
                 // P/R (permanently active) and LARA_FUA-matched records get
                 // a label; everything else (CTR, TMA, D, FIR, ...) does not.
                 let label = null;
                 if (needsLabel(record, type)) {
-                    const center = layer.getBounds().getCenter();
+                    const center = polygonCentroid(latlngs);
                     label = L.marker(center, {
                         pane: 'airspaceLabelPane',
                         interactive: false,
@@ -4475,7 +4653,7 @@
 
                 getOrCreateTypeGroup(type).addLayer(layer);
 
-                airspaceIndex.set(id, { record, layer, type, signature, label });
+                airspaceIndex.set(id, { record, layer, type, signature, label, latlngs });
             }
 
             function removeAirspace(id) {
@@ -4924,13 +5102,13 @@
 
                 const header = document.createElement('div');
                 header.className = 'airspace-type-header';
-                header.innerHTML = '<div>TYPE</div><div class="airspace-type-header-check static-h">S</div><div class="airspace-type-header-check scheduled-h">SC</div><div class="airspace-type-header-check activated-h">A</div>';
+                header.innerHTML = '<div>TYPE</div><div class="airspace-type-header-check static-h">S</div><div class="airspace-type-header-check scheduled-h">P</div><div class="airspace-type-header-check activated-h">A</div>';
                 container.appendChild(header);
 
                 const CHECK_DEFS = [
                     { key:'static', cls:'static-cell', title:'Static' },
-                    { key:'scheduled', cls:'scheduled-cell', title:'Scheduled' },
-                    { key:'activated', cls:'activated-cell', title:'Active' }
+                    { key:'scheduled', cls:'scheduled-cell', title:'Published' },
+                    { key:'activated', cls:'activated-cell', title:'Activated' }
                 ];
 
                 Array.from(discoveredTypes).sort((a,b) => {
@@ -5121,6 +5299,145 @@
                 });
             }
 
+            // ---- AIRSPACE INFO hover engine ---------------------------------
+            //
+            // Leaflet's Canvas renderer only ever fires mouseover/tooltip
+            // events for the single topmost polygon under the cursor (it
+            // hit-tests in reverse draw order and stops at the first
+            // match), so a per-layer bound tooltip would be structurally
+            // incapable of showing more than one airspace at a time --
+            // which is why layers have no bound tooltip at all (see
+            // renderAirspace). This is an independent, map-wide mousemove
+            // listener that hit-tests every visible airspace's own
+            // geometry directly (see pointInAirspacePolygon) and reports
+            // every match, not just the topmost.
+
+            let airspaceInfoEnabled = false;
+            let hoveredIds = [];
+            let infoTooltip = null;
+
+            // Smaller polygons are listed first -- when a small CTR sits
+            // entirely inside a larger TMA, the more specific airspace is
+            // almost always what the user is actually pointing at, so it
+            // reads best at the top of the list.
+            function ringArea(latlngs) {
+                if (!latlngs || latlngs.length === 0) return Infinity;
+                const isMultiRing = Array.isArray(latlngs[0][0]);
+                const outer = isMultiRing
+                    ? latlngs.reduce((best, ring) => {
+                        const a = ringCentroidAndArea(ring);
+                        const area = a ? Math.abs(a.area) : 0;
+                        return area > best ? area : best;
+                    }, 0)
+                    : (ringCentroidAndArea(latlngs) ? Math.abs(ringCentroidAndArea(latlngs).area) : 0);
+                return outer;
+            }
+
+            function findHoveredIds(lat, lon) {
+                const matches = [];
+                airspaceIndex.forEach((entry, id) => {
+                    if (!isRecordVisible(entry.record, entry.type)) return;
+                    if (!entry.latlngs) return;
+                    if (pointInAirspacePolygon(lat, lon, entry.latlngs)) {
+                        matches.push(id);
+                    }
+                });
+                matches.sort((a, b) => {
+                    const ea = airspaceIndex.get(a);
+                    const eb = airspaceIndex.get(b);
+                    return ringArea(ea.latlngs) - ringArea(eb.latlngs);
+                });
+                return matches;
+            }
+
+            function setHighlighted(ids) {
+                const idSet = new Set(ids);
+                // Un-highlight anything that was highlighted before but
+                // isn't in the new set, restoring its normal computed
+                // style (not just the highlight style) in case its own
+                // static/published/active state changed while hovered.
+                hoveredIds.forEach((id) => {
+                    if (idSet.has(id)) return;
+                    const entry = airspaceIndex.get(id);
+                    if (!entry) return;
+                    restoreLayerVisualStyle(entry.layer, styleForAirspace(entry.record, entry.type));
+                });
+                ids.forEach((id) => {
+                    const entry = airspaceIndex.get(id);
+                    if (!entry) return;
+                    entry.layer.setStyle(Object.assign({ interactive: true }, airspaceHoverStyleForType(entry.type)));
+                });
+                hoveredIds = ids;
+            }
+
+            function showInfoTooltip(ids, latlng) {
+                if (ids.length === 0) {
+                    if (infoTooltip) {
+                        map.closeTooltip(infoTooltip);
+                        infoTooltip = null;
+                    }
+                    return;
+                }
+
+                const html = ids
+                    .map((id) => airspaceIndex.get(id))
+                    .filter(Boolean)
+                    .map((entry) => buildAirspaceInfoEntryHTML(entry.record))
+                    .join('');
+
+                if (infoTooltip) {
+                    infoTooltip.setLatLng(latlng);
+                    infoTooltip.setContent(html);
+                } else {
+                    infoTooltip = L.tooltip({
+                        className: 'airspace-info-tooltip',
+                        sticky: false,
+                        direction: 'top',
+                        offset: [0, -8],
+                        interactive: false,
+                        pane: 'airspaceInfoTooltipPane'
+                    })
+                        .setLatLng(latlng)
+                        .setContent(html)
+                        .addTo(map);
+                }
+            }
+
+            function handleAirspaceInfoMouseMove(e) {
+                if (!airspaceInfoEnabled || !showAll) {
+                    if (hoveredIds.length > 0 || infoTooltip) clearAirspaceInfoHover();
+                    return;
+                }
+                const { lat, lng } = e.latlng;
+                const ids = findHoveredIds(lat, lng);
+                setHighlighted(ids);
+                showInfoTooltip(ids, e.latlng);
+            }
+
+            function clearAirspaceInfoHover() {
+                setHighlighted([]);
+                if (infoTooltip) {
+                    map.closeTooltip(infoTooltip);
+                    infoTooltip = null;
+                }
+            }
+
+            function setAirspaceInfoEnabled(enabled) {
+                airspaceInfoEnabled = enabled;
+                if (!enabled) clearAirspaceInfoHover();
+            }
+
+            function initHoverInfo() {
+                map.on('mousemove', handleAirspaceInfoMouseMove);
+                map.on('mouseout', clearAirspaceInfoHover);
+
+                const checkbox = document.getElementById('airspace-info-toggle');
+                if (checkbox) {
+                    setAirspaceInfoEnabled(checkbox.checked);
+                    checkbox.addEventListener('change', () => setAirspaceInfoEnabled(checkbox.checked));
+                }
+            }
+
             // Formats a slider value (hundreds of feet, i.e. FL) as the
             // altitude label text used above the Floor/Ceiling sliders.
             // 0 reads as "SFC" (surface) and the slider's top step reads
@@ -5241,6 +5558,7 @@
 
             async function init() {
                 wireFilterControls();
+                initHoverInfo();
                 await refresh();
                 renderTypeFilterUI();
                 applyFilters();
