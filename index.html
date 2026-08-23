@@ -2,13 +2,49 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<title>LHBP Radar</title>
     <link rel="icon" href="./lhbp-radar-favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+		html, body { width: 100%; height: 100%; }
 		body { margin: 0; background-color: #000; overflow: hidden; }
-        #radar-scope { width: 100vw; height: 100vh; background: #080808; }
+        #radar-scope { width: 100%; height: 100vh; height: 100dvh; background: #000; }
+
+        /* Datablock leader-line canvas. Each leader is geometrically split
+           around only its own datablock row rectangles, then all visible
+           segments are stroked in one pass. This preserves pair-specific row
+           masking without animating a viewport-sized SVG,
+           which caused Chromium to rasterize multiple GPU tiles every frame.
+           The canvas is pointer-events:none; datablocks keep handling input via
+           .atc-label-clickable's pointer-events:auto. */
+        #datablock-leader-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 705;
+        }
+
+        /* Datablock drag affordance + emergency row, mirroring the
+           datablock.html prototype. */
+        .atc-label-clickable {
+            cursor: grab;
+        }
+        .atc-label-clickable.datablock-dragging {
+            cursor: grabbing;
+        }
+        .atc-label-emergency {
+            color: #ff2020;
+            animation: datablockEmergencyBlink 2s steps(1, end) infinite;
+        }
+        @keyframes datablockEmergencyBlink {
+            0%, 49% { color: #ff2020; }
+            50%, 100% { color: #a00000; }
+        }
         
         /* Dynamic Zulu Clock Header Indicator */
         .radar-clock-panel {
@@ -410,39 +446,42 @@
         /* ATC Target Square */
         .atc-target-icon {
             background: transparent;
-            border: 2.2px solid #5DEB3D;
+            border: none;
             border-radius: 50%;
-            width: 7px;
-            height: 7px;
-            transform: translate(-50%, -50%);
-            box-sizing: border-box;
-        }
-        .atc-target-icon.selected {
-            box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
-        }
-        /* Invisible DOM click target for aircraft selection, replacing a
-           canvas CircleMarker (see aircraftHitAreaIcon in script). Same
-           18px diameter as the previous radius-9 circle. */
-        .aircraft-hit-area-icon {
             width: 18px;
             height: 18px;
-            border-radius: 50%;
-            background: transparent;
             transform: translate(-50%, -50%);
             box-sizing: border-box;
             pointer-events: auto;
             cursor: pointer;
         }
-        /* aircraftPane's Canvas renderer (speedLine/leaderLine polylines,
-           history dots) paints into one full-viewport <canvas> even where
-           nothing is drawn, and that canvas -- being the topmost DOM
-           element at every point on the map, since aircraftPane sits
-           above airspacePane, waypoint panes, etc. -- silently swallowed
-           mouse events for every layer beneath it, map-wide, not just
-           where an aircraft is actually drawn. pointer-events:none here
-           lets those events fall through; aircraft click/hover still work
-           through real DOM elements (ui.marker, ui.hitArea) inside this
-           same pane, which set their own pointer-events:auto. */
+        .atc-target-icon::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 11px;
+            height: 11px;
+            border: 2.2px solid #5DEB3D;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box;
+        }
+        .atc-target-icon.selected::before {
+            box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
+        }
+        /* aircraftPane's Canvas renderer (speedLine polylines, history
+           dots) paints into one full-viewport <canvas> even where nothing
+           is drawn, and that canvas -- being the topmost DOM element at
+           every point on the map, since aircraftPane sits above
+           airspacePane, waypoint panes, etc. -- silently swallowed mouse
+           events for every layer beneath it, map-wide, not just where an
+           aircraft is actually drawn. pointer-events:none here lets those
+           events fall through; aircraft click/hover still work through
+           the real DOM ui.marker element inside this same
+           pane, which set their own pointer-events:auto. (The datablock
+           leader line is a separate SVG overlay, not in this pane -- see
+           #datablock-leader-canvas.) */
         #radar-scope .leaflet-aircraft-pane > canvas {
             pointer-events: none;
         }
@@ -462,9 +501,9 @@
         }
         /* MLAT-sourced aircraft are shown as a rectangle instead of a
            circle, so the position source is distinguishable at a glance. */
-        .atc-target-icon.mlat {
-            width: 6px;
-            height: 6px;
+        .atc-target-icon.mlat::before {
+            width: 11px;
+            height: 11px;
             border-radius: 1px;
         }
             /* Separate sidebar groups: view presets, runway toggle, settings */
@@ -1046,6 +1085,60 @@
             outline: none !important;
         }
 
+        /* Phone layout: keep the map full-screen while moving the launcher
+           and settings into thumb-friendly bottom controls. */
+        @media (max-width: 600px) {
+            .radar-ui-wrapper {
+                top: auto;
+                right: max(8px, env(safe-area-inset-right));
+                bottom: max(8px, env(safe-area-inset-bottom));
+                left: max(8px, env(safe-area-inset-left));
+                transform: none;
+                display: block;
+            }
+
+            .radar-ui-launcher {
+                width: 100%;
+                box-sizing: border-box;
+                flex-direction: row;
+                align-items: center;
+                justify-content: flex-start;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scrollbar-width: none;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .radar-ui-launcher::-webkit-scrollbar { display: none; }
+
+            .radar-launch-group {
+                display: flex;
+                flex: none;
+            }
+
+            .radar-launch-btn {
+                width: 48px;
+                height: 44px;
+                flex: none;
+            }
+
+            .radar-ui-panel {
+                position: fixed;
+                inset: auto max(8px, env(safe-area-inset-right))
+                    max(8px, env(safe-area-inset-bottom))
+                    max(8px, env(safe-area-inset-left));
+                width: auto;
+                max-height: min(70dvh, 560px);
+                transform: none;
+                border-radius: 14px;
+            }
+
+            @keyframes radarPanelIn {
+                from { opacity: 0; transform: translateY(12px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        }
+
 </style>
 </head>
 <body>
@@ -1102,6 +1195,7 @@
 
         <div class="radar-ui-panel" data-panel-view="map">
             <div class="radar-panel-heading"><span>MAP</span><button type="button" class="radar-panel-close">×</button></div>
+            <button type="button" class="radar-onoff-control" data-checkbox-id="basemap-enabled"><span>BASEMAP</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="basemap-enabled" class="radar-hidden-checkbox" checked>
             <button type="button" class="radar-onoff-control" data-checkbox-id="map-labels"><span>MAP LABELS</span><b class="onoff-state OFF">OFF</b></button><input type="checkbox" id="map-labels" class="radar-hidden-checkbox">
             <button type="button" class="radar-onoff-control" data-checkbox-id="layer-waypoints"><span>WAYPOINTS (FIX)</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="layer-waypoints" class="radar-hidden-checkbox" checked>
             <button type="button" class="radar-onoff-control" data-checkbox-id="strip-bp-prefix"><span>STRIP "BP" PREFIX</span><b class="onoff-state ON">ON</b></button><input type="checkbox" id="strip-bp-prefix" class="radar-hidden-checkbox" checked>
@@ -1211,6 +1305,7 @@
         </div>
     </div>
     <div id="radar-scope"></div>
+    <canvas id="datablock-leader-canvas"></canvas>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
@@ -1574,7 +1669,7 @@
         // .leaflet-aircraft-pane canvas rule in the stylesheet sets
         // pointer-events:none so events fall through to panes below;
         // aircraft interaction still works because it goes through real
-        // DOM elements (ui.marker, ui.hitArea -- see aircraftHitAreaIcon)
+        // DOM aircraft marker elements
         // which set pointer-events:auto on themselves individually.
 
         // Leaflet's Canvas renderer (used because the map runs with
@@ -1586,7 +1681,7 @@
         // the same pane even when the tooltip is later in DOM order.
         // Datablocks get their own pane above aircraftPane so their
         // clicks reach the tooltip instead of being swallowed by the
-        // traffic canvas (hitArea circles, speed/leader lines, history dots).
+        // traffic canvas (speed lines and history dots).
         map.createPane('datablockPane');
         map.getPane('datablockPane').style.zIndex = 710;
 
@@ -1613,19 +1708,23 @@
         const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
         const darkAllNoLabels   = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png');
 
-        // Add default basemap without labels to map
-        darkAllNoLabels.addTo(map);
+        const basemapEnabledInput = document.getElementById('basemap-enabled');
+        const mapLabelsInput = document.getElementById('map-labels');
 
-        // Map Labels Toggle Listener
-        document.getElementById('map-labels').addEventListener('change', function(e) {
-            if (e.target.checked) {
-                map.removeLayer(darkAllNoLabels);
-                map.addLayer(darkAllWithLabels);
-            } else {
-                map.removeLayer(darkAllWithLabels);
-                map.addLayer(darkAllNoLabels);
+        function syncBasemap() {
+            map.removeLayer(darkAllWithLabels);
+            map.removeLayer(darkAllNoLabels);
+
+            if (basemapEnabledInput.checked) {
+                map.addLayer(mapLabelsInput.checked ? darkAllWithLabels : darkAllNoLabels);
             }
-        });
+        }
+
+        // Default to the label-free basemap. With the basemap disabled, Leaflet's
+        // transparent map panes reveal the solid black radar-scope background.
+        syncBasemap();
+        basemapEnabledInput.addEventListener('change', syncBasemap);
+        mapLabelsInput.addEventListener('change', syncBasemap);
 
         // ==========================================
         // RainViewer Precipitation Radar Overlay
@@ -2714,6 +2813,8 @@
         // HISTORY_DOT_MIN_OPACITY (oldest) across the visible trail.
         const HISTORY_DOT_MAX_OPACITY = 1;
         const HISTORY_DOT_MIN_OPACITY = 0.15;
+        const POSITION_UPDATE_THRESHOLD_PX = 0.5;
+        const PREDICTION_UPDATE_INTERVAL_MS = 100; // 10Hz is ample for vectors
         let PREDICT_MINUTES = 0.25;
         const RADAR_CENTER = [47.4369, 19.2556];
         const RADAR_RADIUS_NM = 150;
@@ -2727,14 +2828,89 @@
         trafficStatusEl.textContent = 'Traffic: connecting...';
         document.querySelector('.radar-ui-panel[data-panel-view="aircraft"]').appendChild(trafficStatusEl);
 
-        const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [11, 11] });
-        // Real DOM hit target for aircraft click selection (see hitArea
-        // below). Kept as an L.marker rather than a canvas CircleMarker so
-        // it isn't rendered into aircraftPane's full-viewport canvas --
-        // that canvas has pointer-events:none (see CSS) so airspace hover
-        // beneath it isn't blocked map-wide; a canvas-based hit target
-        // would have been invisible to the browser's hit-test entirely.
-        const aircraftHitAreaIcon = L.divIcon({ className: 'aircraft-hit-area-icon', iconSize: [18, 18] });
+        // One 18px DOM marker serves as both the click target and the visual
+        // target; its ::before pseudo-element draws the smaller radar symbol.
+        const targetDivIcon = L.divIcon({ className: 'atc-target-icon', iconSize: [18, 18] });
+
+        // Permanent Leaflet tooltips synchronously measure their dimensions
+        // from _setPosition whenever setLatLng() moves them. With one tooltip
+        // per aircraft at animation-frame frequency, that forced one layout
+        // per visible aircraft per frame. Datablocks instead live as stable
+        // DOM nodes in the dedicated pane and move solely through a compositor-
+        // friendly transform; the small API mirrors the methods used below.
+        function createAircraftDatablock() {
+            const element = document.createElement('div');
+            element.className = 'leaflet-tooltip leaflet-zoom-animated leaflet-tooltip-right atc-label atc-label-clickable';
+            element.style.opacity = '0';
+            element.style.willChange = 'transform';
+            map.getPane('datablockPane').appendChild(element);
+
+            let latlng = L.latLng(0, 0);
+            let opacity = 0;
+            let layerPoint = L.point(0, 0);
+            let halfHeightPx = 0;
+
+            function applyPixelSnappedPosition() {
+                const x = Math.round(layerPoint.x + 6);
+                const y = Math.round(layerPoint.y - 10 - halfHeightPx);
+                element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+            }
+
+            // Percentage centering (translateY(-50%)) puts text on fractional
+            // pixels whenever the datablock height changes, notably when the
+            // selected-altitude row is enabled. ResizeObserver supplies the
+            // height asynchronously, avoiding a forced synchronous layout.
+            const sizeObserver = new ResizeObserver(entries => {
+                const entry = entries[0];
+                const borderBox = Array.isArray(entry?.borderBoxSize)
+                    ? entry.borderBoxSize[0]
+                    : entry?.borderBoxSize;
+                const height = borderBox?.blockSize ?? entry?.contentRect?.height;
+                if (!Number.isFinite(height)) return;
+                const nextHalfHeight = Math.round(height / 2);
+                if (nextHalfHeight === halfHeightPx) return;
+                halfHeightPx = nextHalfHeight;
+                applyPixelSnappedPosition();
+            });
+            sizeObserver.observe(element);
+
+            const tooltipApi = {
+                getElement: () => element,
+                on(type, handler) {
+                    element.addEventListener(type, originalEvent => handler({ originalEvent }));
+                    return tooltipApi;
+                }
+            };
+
+            return {
+                getTooltip: () => tooltipApi,
+                getLatLng: () => latlng,
+                setLatLng(nextLatLng) {
+                    latlng = L.latLng(nextLatLng);
+                    layerPoint = map.latLngToLayerPoint(latlng);
+                    // Match Leaflet's former right-facing tooltip placement:
+                    // 6px right of the anchor, vertically centered, with the
+                    // configured -10px tooltip offset.
+                    applyPixelSnappedPosition();
+                    return this;
+                },
+                setTooltipContent(html) {
+                    element.innerHTML = html;
+                    return this;
+                },
+                setOpacity(nextOpacity) {
+                    if (opacity !== nextOpacity) {
+                        opacity = nextOpacity;
+                        element.style.opacity = String(nextOpacity);
+                    }
+                    return this;
+                },
+                remove() {
+                    sizeObserver.disconnect();
+                    element.remove();
+                }
+            };
+        }
 
         function setTrafficSource(source, statusText, siteDomain) {
             trafficSource = source;
@@ -2894,6 +3070,15 @@
         // Squawk codes that denote an emergency/special condition, shown in
         // red instead of the normal value color.
         const EMERGENCY_SQUAWKS = new Set(['7500', '7600', '7700']);
+
+        // ICAO emergency squawk labels, shown as an extra blinking row on
+        // the datablock (see blockHTML in renderLoop) when a matching
+        // squawk is set.
+        const EMERGENCY_SQUAWK_LABELS = {
+            '7500': 'HIJACK',
+            '7600': 'NORDO',
+            '7700': 'EMERGENCY'
+        };
 
         function closeAircraftInfoPanel() {
             openAircraftInfoId = null;
@@ -3153,33 +3338,45 @@
                 latestHeading: 0,
                 onGround: false,
                 srcType: srcType || "OTHER",
+                isFilteredVisible: false,
+                markerVisible: false,
+                speedLineVisible: true,
+                lastAircraftPoint: null,
+                lastDatablockPoint: null,
+                lastPredictionUpdateTime: 0,
                 telemetry: [],
                 historyDots: [],
                 historyDotRevealCount: 0,
                 trackHistory: [],
+                // User-repositioned datablock offset, in screen pixels
+                // from the aircraft's current projected position. null
+                // until the user drags the datablock for the first time,
+                // at which point renderLoop switches from the default
+                // fixed-angle placement to this offset and keeps using it
+                // for the life of this aircraft's track (see
+                // DRAG_THRESHOLD_PX / datablock drag handling below).
+                datablockOffset: null,
                 featureGroup: L.featureGroup().addTo(trafficGroup),
                 ui: {
                     marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0, pane: 'aircraftPane' }),
-                    hitArea: L.marker([0, 0], { icon: aircraftHitAreaIcon, interactive: true, bubblingMouseEvents: false, opacity: 0, pane: 'aircraftPane' }),
                     speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 1, interactive: false, pane: 'aircraftPane' }),
-                    leaderLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.5, opacity: 1, interactive: false, pane: 'aircraftPane' }),
-                    dataBlock: L.marker([0,0], { icon: L.divIcon({ className: 'wp-triangle-icon', html: '' }), interactive: false, opacity: 0, pane: 'datablockPane' })
-                        .bindTooltip('', { permanent: true, direction: 'right', className: 'atc-label atc-label-clickable', offset: [0, -10], pane: 'datablockPane', interactive: true })
+                    dataBlock: createAircraftDatablock()
                 }
             };
             const ui = aircraftState[id].ui;
             ui.marker.addTo(aircraftState[id].featureGroup);
-            ui.hitArea.addTo(aircraftState[id].featureGroup);
             ui.speedLine.addTo(aircraftState[id].featureGroup);
-            ui.leaderLine.addTo(aircraftState[id].featureGroup);
-            ui.dataBlock.addTo(aircraftState[id].featureGroup);
+
+            // The leader line connecting the aircraft dot to its datablock
+            // is drawn as a masked SVG <line> in the shared
+            // #datablock-leader-canvas overlay rather than as a Leaflet
+            // polyline (see createDatablockLeaderLine / updateDatablockLeaderLine)
+            // -- row-masking so the line stops at each text row's edge
+            // isn't possible against Leaflet's Canvas polyline renderer.
+            createDatablockLeaderLine(id);
 
             updateMarkerSourceShape(id);
 
-            ui.hitArea.on('click', function(e) {
-                L.DomEvent.stopPropagation(e);
-                selectAircraft(id);
-            });
             ui.marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 selectAircraft(id);
@@ -3189,8 +3386,15 @@
             // DivOverlay.prototype._initLayout -> addInteractiveTarget),
             // not on the marker it's attached to -- so the click handler
             // has to go on the tooltip object, not on ui.dataBlock.
+            // A click here means "the user pressed and released without
+            // dragging" -- see datablockDidDrag in the pointerdown
+            // delegate below, which suppresses this when a drag happened.
             ui.dataBlock.getTooltip().on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
+                if (datablockDidDrag) {
+                    datablockDidDrag = false;
+                    return;
+                }
                 selectAircraft(id);
                 openAircraftInfoPanel(id);
             });
@@ -3240,6 +3444,7 @@
                 if (!lastData || lastData.lat !== t.lat || lastData.lon !== t.lon) {
                     state.telemetry.push({ time: now, lat: t.lat, lon: t.lon, alt: t.alt, spd: t.spd, hdg: t.hdg });
                     if (state.telemetry.length > 4) state.telemetry.shift();
+                    state.lastPredictionUpdateTime = 0;
 
                     state.trackHistory.push([t.lat, t.lon]);
                     // Cap the full flight-path trail so long-running sessions
@@ -3293,6 +3498,8 @@
                     if (selectedAircraftIds.has(id)) {
                         deselectAircraft(id);
                     }
+                    removeDatablockLeaderLine(id);
+                    aircraftState[id].ui.dataBlock.remove();
                     delete aircraftState[id];
                 }
             });
@@ -3329,6 +3536,7 @@
                 const matchesGroundFilter = showGroundTraffic || !state.onGround;
 
                 if (trafficLayerActive && fl <= limitFL && matchesHardwareFilter && matchesGroundFilter) {
+                    state.isFilteredVisible = true;
                     if (!trafficGroup.hasLayer(state.featureGroup)) {
                         trafficGroup.addLayer(state.featureGroup);
                         // Leaflet creates a fresh DOM element for the marker
@@ -3340,6 +3548,13 @@
                         updateMarkerSourceShape(id);
                     }
                 } else {
+                    state.isFilteredVisible = false;
+                    state.ui.dataBlock.setOpacity(0);
+                    const leaderEntry = datablockLeaderLines.get(id);
+                    if (leaderEntry && leaderEntry.visible) {
+                        leaderEntry.visible = false;
+                        leaderCanvasDirty = true;
+                    }
                     if (trafficGroup.hasLayer(state.featureGroup)) {
                         trafficGroup.removeLayer(state.featureGroup);
                     }
@@ -3362,9 +3577,347 @@
         updateLeaderLineNM();
         map.on('zoomend move', updateLeaderLineNM);
 
-        // Cached DOM references for renderLoop (runs up to 60x/sec via
-        // requestAnimationFrame) -- avoids repeated getElementById lookups
-        // on every single frame.
+        // ---------------------------------------------------------------
+        // Datablock leader lines (single masked Canvas overlay)
+        // ---------------------------------------------------------------
+        const leaderCanvasEl = document.getElementById('datablock-leader-canvas');
+        const leaderCanvasCtx = leaderCanvasEl.getContext('2d');
+        const datablockLeaderLines = new Map();
+        let datablockGeometryEpoch = 0;
+        let revealLeaderCanvasAfterRender = false;
+        let leaderCanvasDirty = true;
+        const DATABLOCK_MASK_PAD_X = 3;
+        const DATABLOCK_MASK_PAD_Y = 1;
+
+        map.on('zoomstart', () => {
+            leaderCanvasEl.style.visibility = 'hidden';
+        });
+        map.on('zoomend', () => {
+            datablockGeometryEpoch++;
+            revealLeaderCanvasAfterRender = true;
+        });
+        map.on('moveend resize', () => {
+            datablockGeometryEpoch++;
+        });
+
+        function createDatablockLeaderLine(id) {
+            datablockLeaderLines.set(id, {
+                visible: false,
+                x1: 0, y1: 0, x2: 0, y2: 0,
+                lastCornerOffsetX: null,
+                lastCornerOffsetY: null,
+                measuredDatablockX: null,
+                measuredDatablockY: null,
+                measuredGeometryEpoch: -1,
+                maskRects: [],
+                lastHTML: null
+            });
+            leaderCanvasDirty = true;
+        }
+
+        function removeDatablockLeaderLine(id) {
+            datablockLeaderLines.delete(id);
+            leaderCanvasDirty = true;
+        }
+
+        function updateDatablockLeaderLine(id, aircraftX, aircraftY, datablockX, datablockY, tooltipEl, blockHTML, isDragging) {
+            const entry = datablockLeaderLines.get(id);
+            if (!entry) return;
+            if (!tooltipEl || !document.contains(tooltipEl)) {
+                if (entry.visible) leaderCanvasDirty = true;
+                entry.visible = false;
+                return;
+            }
+
+            if (!entry.visible) leaderCanvasDirty = true;
+            entry.visible = true;
+            const contentChanged = entry.lastHTML !== blockHTML;
+            const needsMeasurement =
+                entry.lastCornerOffsetX === null ||
+                entry.lastCornerOffsetY === null ||
+                entry.measuredGeometryEpoch !== datablockGeometryEpoch ||
+                contentChanged ||
+                isDragging;
+
+            let cornerX = datablockX + (entry.lastCornerOffsetX || 0);
+            let cornerY = datablockY + (entry.lastCornerOffsetY || 0);
+
+            if (needsMeasurement) {
+                const rows = Array.from(tooltipEl.querySelectorAll('div')).filter(
+                    d => d.querySelector('div') === null
+                );
+                if (rows.length === 0) {
+                    entry.visible = false;
+                    return;
+                }
+
+                const scopeRect = map.getContainer().getBoundingClientRect();
+                const firstRowRect = rows[0].getBoundingClientRect();
+                cornerX = firstRowRect.left - scopeRect.left;
+                cornerY = firstRowRect.top - scopeRect.top;
+                entry.lastCornerOffsetX = cornerX - datablockX;
+                entry.lastCornerOffsetY = cornerY - datablockY;
+                entry.measuredDatablockX = datablockX;
+                entry.measuredDatablockY = datablockY;
+                entry.measuredGeometryEpoch = datablockGeometryEpoch;
+                entry.lastHTML = blockHTML;
+
+                entry.maskRects = rows.map(row => {
+                    const rect = row.getBoundingClientRect();
+                    const textRange = document.createRange();
+                    textRange.selectNodeContents(row);
+                    const textRect = textRange.getBoundingClientRect();
+                    const useTextRect = textRect.width > 0 && textRect.width <= rect.width;
+                    return {
+                        x: (useTextRect ? textRect.left : rect.left) - scopeRect.left - DATABLOCK_MASK_PAD_X,
+                        y: rect.top - scopeRect.top - DATABLOCK_MASK_PAD_Y,
+                        width: (useTextRect ? textRect.width : rect.width) + DATABLOCK_MASK_PAD_X * 2,
+                        height: rect.height + DATABLOCK_MASK_PAD_Y * 2
+                    };
+                });
+                leaderCanvasDirty = true;
+            }
+
+            const nextX2 = cornerX + 30;
+            const nextY2 = cornerY + 10;
+            if (Math.hypot(aircraftX - entry.x1, aircraftY - entry.y1) >= POSITION_UPDATE_THRESHOLD_PX ||
+                Math.hypot(nextX2 - entry.x2, nextY2 - entry.y2) >= POSITION_UPDATE_THRESHOLD_PX) {
+                entry.x1 = aircraftX;
+                entry.y1 = aircraftY;
+                entry.x2 = nextX2;
+                entry.y2 = nextY2;
+                leaderCanvasDirty = true;
+            }
+        }
+
+        // Return the [enter, exit] parameter interval where one line segment
+        // lies inside an axis-aligned rectangle (Liang-Barsky clipping).
+        // null means the line never enters that rectangle.
+        function lineRectangleInterval(x1, y1, x2, y2, rect) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const p = [-dx, dx, -dy, dy];
+            const q = [
+                x1 - rect.x,
+                rect.x + rect.width - x1,
+                y1 - rect.y,
+                rect.y + rect.height - y1
+            ];
+            let enter = 0;
+            let exit = 1;
+
+            for (let i = 0; i < 4; i++) {
+                if (Math.abs(p[i]) < 1e-9) {
+                    if (q[i] < 0) return null;
+                    continue;
+                }
+                const t = q[i] / p[i];
+                if (p[i] < 0) enter = Math.max(enter, t);
+                else exit = Math.min(exit, t);
+                if (enter > exit) return null;
+            }
+            return [enter, exit];
+        }
+
+        function appendPairMaskedLeaderPath(ctx, entry) {
+            const dx = entry.x2 - 30 - entry.lastCornerOffsetX - entry.measuredDatablockX;
+            const dy = entry.y2 - 10 - entry.lastCornerOffsetY - entry.measuredDatablockY;
+            const intervals = [];
+
+            entry.maskRects.forEach(rect => {
+                const translatedRect = {
+                    x: rect.x + dx,
+                    y: rect.y + dy,
+                    width: rect.width,
+                    height: rect.height
+                };
+                const interval = lineRectangleInterval(
+                    entry.x1, entry.y1, entry.x2, entry.y2, translatedRect
+                );
+                if (interval) intervals.push(interval);
+            });
+
+            intervals.sort((a, b) => a[0] - b[0]);
+            const merged = [];
+            intervals.forEach(interval => {
+                const previous = merged[merged.length - 1];
+                if (previous && interval[0] <= previous[1]) {
+                    previous[1] = Math.max(previous[1], interval[1]);
+                } else {
+                    merged.push(interval.slice());
+                }
+            });
+
+            const lineDx = entry.x2 - entry.x1;
+            const lineDy = entry.y2 - entry.y1;
+            let cursor = 0;
+            merged.forEach(([start, end]) => {
+                if (start > cursor) {
+                    ctx.moveTo(entry.x1 + lineDx * cursor, entry.y1 + lineDy * cursor);
+                    ctx.lineTo(entry.x1 + lineDx * start, entry.y1 + lineDy * start);
+                }
+                cursor = Math.max(cursor, end);
+            });
+            if (cursor < 1) {
+                ctx.moveTo(entry.x1 + lineDx * cursor, entry.y1 + lineDy * cursor);
+                ctx.lineTo(entry.x2, entry.y2);
+            }
+        }
+
+        function drawDatablockLeaderLines() {
+            if (!leaderCanvasDirty) return;
+            const width = map.getContainer().clientWidth;
+            const height = map.getContainer().clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            const pixelWidth = Math.round(width * dpr);
+            const pixelHeight = Math.round(height * dpr);
+            if (leaderCanvasEl.width !== pixelWidth || leaderCanvasEl.height !== pixelHeight) {
+                leaderCanvasEl.width = pixelWidth;
+                leaderCanvasEl.height = pixelHeight;
+            }
+
+            leaderCanvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            leaderCanvasCtx.clearRect(0, 0, width, height);
+            leaderCanvasCtx.globalCompositeOperation = 'source-over';
+            leaderCanvasCtx.strokeStyle = '#5DEB3D';
+            leaderCanvasCtx.lineWidth = 1.5;
+            leaderCanvasCtx.beginPath();
+            datablockLeaderLines.forEach(entry => {
+                if (!entry.visible) return;
+                if (entry.measuredDatablockX === null || entry.maskRects.length === 0) {
+                    leaderCanvasCtx.moveTo(entry.x1, entry.y1);
+                    leaderCanvasCtx.lineTo(entry.x2, entry.y2);
+                    return;
+                }
+                appendPairMaskedLeaderPath(leaderCanvasCtx, entry);
+            });
+            leaderCanvasCtx.stroke();
+            leaderCanvasDirty = false;
+        }
+
+        // ---------------------------------------------------------------
+        // Datablock dragging (repositioning)
+        // ---------------------------------------------------------------
+        // Delegated pointer events on the map container, matching
+        // initRubberBandSelect's delegation style, rather than binding
+        // directly to each tooltip's DOM element -- the tooltip element
+        // is recreated by Leaflet at times outside our control (e.g.
+        // certain re-renders), and delegation sidesteps needing to know
+        // when that happens. e.target.closest('.atc-label-clickable')
+        // identifies a datablock click/drag the same way the click
+        // handler in initAircraftState already does.
+        //
+        // Marker({draggable:true}) was deliberately NOT used here: this
+        // datablock's clickable/visible surface is the bound Tooltip's own
+        // DOM element, not the (invisible, interactive:false) marker
+        // icon -- and Leaflet does not move a draggable marker when you
+        // drag its tooltip instead of its icon (confirmed via
+        // https://github.com/Leaflet/Leaflet/issues/6225); dragging the
+        // tooltip pans the map instead. Manual pointer capture on the
+        // tooltip element, with map.dragging disabled for the duration
+        // (same pattern as box-select), avoids that entirely.
+        const DATABLOCK_DRAG_THRESHOLD_PX = 4;
+        let datablockDraggingId = null;   // aircraft id currently being dragged, or null
+        let datablockDraggingTooltipEl = null; // the tooltip DOM element for datablockDraggingId
+        let datablockDidDrag = false;     // true once movement crossed the threshold this press
+        let datablockPointerDownX = 0;
+        let datablockPointerDownY = 0;
+        let datablockDragStartOffset = { dx: 0, dy: 0 }; // this aircraft's offset at pointerdown
+
+        function initDatablockDragging() {
+            const container = map.getContainer();
+
+            container.addEventListener('pointerdown', (e) => {
+                if (e.button !== undefined && e.button !== 0) return;
+                const tooltipEl = e.target.closest && e.target.closest('.atc-label-clickable');
+                if (!tooltipEl) return;
+
+                // Find which aircraft this tooltip belongs to. Aircraft
+                // counts here are small enough (dozens) that a linear
+                // scan on pointerdown -- a rare, user-driven event, not a
+                // per-frame one -- is negligible.
+                let id = null;
+                for (const key of Object.keys(aircraftState)) {
+                    const t = aircraftState[key].ui.dataBlock.getTooltip();
+                    if (t && t.getElement() === tooltipEl) { id = key; break; }
+                }
+                if (id === null) return;
+
+                datablockDraggingId = id;
+                datablockDraggingTooltipEl = tooltipEl;
+                datablockDidDrag = false;
+                datablockPointerDownX = e.clientX;
+                datablockPointerDownY = e.clientY;
+
+                const state = aircraftState[id];
+                datablockDragStartOffset = state.datablockOffset
+                    ? { dx: state.datablockOffset.dx, dy: state.datablockOffset.dy }
+                    : (() => {
+                        // No offset yet -- derive the equivalent starting
+                        // offset from the datablock's current default
+                        // (fixed-angle) screen position so the drag
+                        // continues smoothly from where the block already
+                        // is, instead of jumping.
+                        const aircraftPoint = map.latLngToContainerPoint(state.ui.marker.getLatLng());
+                        const blockPoint = map.latLngToContainerPoint(state.ui.dataBlock.getLatLng());
+                        return { dx: blockPoint.x - aircraftPoint.x, dy: blockPoint.y - aircraftPoint.y };
+                    })();
+
+                map.dragging.disable(); // don't pan the map while dragging a datablock
+                // Pointer capture is deliberately NOT taken here. Per the
+                // Pointer Events spec, once a pointer is captured, the
+                // resulting "click" event (fired on pointerup) is
+                // dispatched to the captured element instead of bubbling
+                // through the original hit-tree -- which would prevent a
+                // plain click from ever reaching the tooltip's own click
+                // handler (see initAircraftState) and opening the info
+                // panel. Capture is instead taken in pointermove, once
+                // movement has crossed the drag threshold and this
+                // interaction is confirmed to be a drag, not a click.
+            });
+
+            container.addEventListener('pointermove', (e) => {
+                if (datablockDraggingId === null) return;
+
+                const movedX = e.clientX - datablockPointerDownX;
+                const movedY = e.clientY - datablockPointerDownY;
+
+                if (!datablockDidDrag) {
+                    if (Math.hypot(movedX, movedY) < DATABLOCK_DRAG_THRESHOLD_PX) return;
+                    datablockDidDrag = true;
+                    container.setPointerCapture(e.pointerId);
+                    if (datablockDraggingTooltipEl) datablockDraggingTooltipEl.classList.add('datablock-dragging');
+                }
+
+                const state = aircraftState[datablockDraggingId];
+                if (!state) { datablockDraggingId = null; return; }
+
+                state.datablockOffset = {
+                    dx: datablockDragStartOffset.dx + movedX,
+                    dy: datablockDragStartOffset.dy + movedY
+                };
+            });
+
+            function endDatablockDrag(e) {
+                if (datablockDraggingId === null) return;
+                document.querySelectorAll('.atc-label-clickable.datablock-dragging').forEach(el => el.classList.remove('datablock-dragging'));
+
+                datablockDraggingId = null;
+                datablockDraggingTooltipEl = null;
+                map.dragging.enable();
+                try { container.releasePointerCapture(e.pointerId); } catch (_) {}
+                // datablockDidDrag is intentionally left as-is here -- the
+                // tooltip's own 'click' handler (see initAircraftState)
+                // reads and clears it to decide whether this pointerup
+                // should also open the info panel.
+            }
+
+            container.addEventListener('pointerup', endDatablockDrag);
+            container.addEventListener('pointercancel', endDatablockDrag);
+        }
+        initDatablockDragging();
+
+
         const callsignFormatCheckbox = document.getElementById('callsign-format-long');
         const radarSearchInput = document.getElementById('radar-search');
 
@@ -3387,7 +3940,26 @@
             return `${belowTA ? 'A' : ''}${flStr}`;
         }
 
-        function renderLoop() {
+        const MAX_RENDER_FPS = 60;
+        const MIN_RENDER_FRAME_MS = 1000 / MAX_RENDER_FPS;
+        let lastRenderedFrameTime = 0;
+
+        function renderLoop(frameTime) {
+            // requestAnimationFrame follows the display refresh rate, which
+            // was 120Hz in the captured Vivaldi trace. Keep requesting frames
+            // so the tab remains synchronized with the browser, but perform
+            // radar interpolation/DOM/Leaflet work at no more than 60Hz.
+            const elapsed = frameTime - lastRenderedFrameTime;
+            if (lastRenderedFrameTime && elapsed < MIN_RENDER_FRAME_MS - 0.5) {
+                requestAnimationFrame(renderLoop);
+                return;
+            }
+            // Carry a small remainder forward to avoid slowly drifting below
+            // 60Hz when callback timestamps do not land exactly on 16.67ms.
+            lastRenderedFrameTime = lastRenderedFrameTime
+                ? frameTime - (elapsed % MIN_RENDER_FRAME_MS)
+                : frameTime;
+
             const renderTime = Date.now() - RENDER_DELAY_MS;
             const useLongFormat = callsignFormatCheckbox.checked;
 
@@ -3407,6 +3979,7 @@
             Object.keys(aircraftState).forEach(id => {
                 const state = aircraftState[id];
                 if (state.telemetry.length < 2) return;
+                if (!state.isFilteredVisible) return;
 
                 let interpLat, interpLon, interpAlt, interpSpd, interpHdg;
                 let p1 = null, p2 = null;
@@ -3454,21 +4027,66 @@
                 }
 
                 const currentPos = [interpLat, interpLon];
-                state.ui.marker.setLatLng(currentPos).setOpacity(1);
-                state.ui.hitArea.setLatLng(currentPos);
+                const projectedAircraftPoint = map.latLngToContainerPoint(currentPos);
+                const aircraftPositionChanged =
+                    !state.lastAircraftPoint ||
+                    Math.hypot(
+                        projectedAircraftPoint.x - state.lastAircraftPoint.x,
+                        projectedAircraftPoint.y - state.lastAircraftPoint.y
+                    ) >= POSITION_UPDATE_THRESHOLD_PX;
+
+                if (aircraftPositionChanged) {
+                    state.ui.marker.setLatLng(currentPos);
+                    state.lastAircraftPoint = projectedAircraftPoint;
+                }
+                if (!state.markerVisible) {
+                    state.ui.marker.setOpacity(1);
+                    state.markerVisible = true;
+                }
 
                 if (interpSpd > 30 || state.onGround) {
-                    if (interpSpd > 30) {
+                    const predictionVisible = interpSpd > 30;
+                    if (state.speedLineVisible !== predictionVisible) {
+                        state.speedLineVisible = predictionVisible;
+                        state.ui.speedLine.setStyle({ opacity: predictionVisible ? 0.8 : 0 });
+                    }
+                    if (predictionVisible &&
+                        (state.lastPredictionUpdateTime === 0 ||
+                         frameTime - state.lastPredictionUpdateTime >= PREDICTION_UPDATE_INTERVAL_MS)) {
                         const distanceNM = (interpSpd / 60) * PREDICT_MINUTES;
                         const projectedPos = getOffsetPoint(currentPos, distanceNM, interpHdg);
-                        state.ui.speedLine.setLatLngs([currentPos, projectedPos]).setStyle({opacity: 0.8});
-                    } else {
-                        state.ui.speedLine.setStyle({opacity: 0});
+                        state.ui.speedLine.setLatLngs([currentPos, projectedPos]);
+                        state.lastPredictionUpdateTime = frameTime;
                     }
-                    
-                    const leaderEnd = getOffsetPoint(currentPos, leaderLineNM, 45); 
-                    state.ui.leaderLine.setLatLngs([currentPos, leaderEnd]).setStyle({opacity: 0.5});
-                    state.ui.dataBlock.setLatLng(leaderEnd);
+
+                    // Datablock placement: once the user has dragged this
+                    // aircraft's datablock, state.datablockOffset (screen
+                    // pixels from the aircraft) takes over from the
+                    // default fixed-angle placement and persists for the
+                    // life of the aircraft's track (see initAircraftState
+                    // and the drag handling below).
+                    let leaderEnd;
+                    if (state.datablockOffset) {
+                        const aircraftPoint = map.latLngToContainerPoint(currentPos);
+                        const anchorPoint = L.point(
+                            aircraftPoint.x + state.datablockOffset.dx,
+                            aircraftPoint.y + state.datablockOffset.dy
+                        );
+                        leaderEnd = map.containerPointToLatLng(anchorPoint);
+                    } else {
+                        leaderEnd = getOffsetPoint(currentPos, leaderLineNM, 45);
+                    }
+                    const projectedDatablockPoint = map.latLngToContainerPoint(leaderEnd);
+                    const datablockPositionChanged =
+                        !state.lastDatablockPoint ||
+                        Math.hypot(
+                            projectedDatablockPoint.x - state.lastDatablockPoint.x,
+                            projectedDatablockPoint.y - state.lastDatablockPoint.y
+                        ) >= POSITION_UPDATE_THRESHOLD_PX;
+                    if (datablockPositionChanged) {
+                        state.ui.dataBlock.setLatLng(leaderEnd);
+                        state.lastDatablockPoint = projectedDatablockPoint;
+                    }
 
                     const isBelowTA = interpAlt < 10000;
                     const altPrefix = isBelowTA ? 'A' : '';
@@ -3497,12 +4115,18 @@
 
                     const selectedAltitudeEnabled = document.getElementById('show-selected-altitude').checked;
                     const selectedAltitudeLabel = selectedAltitudeEnabled
-                        ? formatDatablockAltitude(state.selectedAltitude)
+                        ? `${formatDatablockAltitude(state.selectedAltitude)}&nbsp;&nbsp;&nbsp;`
                         : '';
                     const wakeLabel = simplifyWakeCategory(state.wake);
                     const typeLabel = wakeLabel ? `${state.actype}/${wakeLabel}` : state.actype;
 
-                    const blockHTML = `<div style="color:${callsignColor}; font-weight:${isAircraftMatched ? 'bold' : 'normal'};">${labelCallsign}</div>` +
+                    const isEmergency = EMERGENCY_SQUAWKS.has(state.squawk);
+                    const emergencyRowHTML = isEmergency
+                        ? `<div class="atc-label-emergency">${EMERGENCY_SQUAWK_LABELS[state.squawk] || 'EMERGENCY'}</div>`
+                        : '';
+
+                    const blockHTML = emergencyRowHTML +
+                                      `<div style="color:${callsignColor}; font-weight:${isAircraftMatched ? 'bold' : 'normal'};">${labelCallsign}</div>` +
                                       `<div style="color:${dataLineColor};">${altLabel}${trend} &nbsp;${spdStr}</div>` +
                                       (selectedAltitudeEnabled
                                           ? `<div style="color:${dataLineColor};">${selectedAltitudeLabel}</div><div style="color:${acTypeColor};">${typeLabel}</div>`
@@ -3513,12 +4137,38 @@
                         state.lastHTML = blockHTML;
                     }
                     state.ui.dataBlock.setOpacity(1);
+
+                    const aircraftPoint = state.lastAircraftPoint || projectedAircraftPoint;
+                    const datablockPoint = state.lastDatablockPoint || projectedDatablockPoint;
+                    const tooltipEl = state.ui.dataBlock.getTooltip().getElement();
+                    updateDatablockLeaderLine(
+                        id,
+                        aircraftPoint.x, aircraftPoint.y,
+                        datablockPoint.x, datablockPoint.y,
+                        tooltipEl,
+                        blockHTML,
+                        datablockDraggingId === id
+                    );
                 } else {
-                    state.ui.speedLine.setStyle({opacity: 0});
-                    state.ui.leaderLine.setStyle({opacity: 0});
+                    if (state.speedLineVisible) {
+                        state.speedLineVisible = false;
+                        state.ui.speedLine.setStyle({ opacity: 0 });
+                    }
                     state.ui.dataBlock.setOpacity(0);
+                    const entry = datablockLeaderLines.get(id);
+                    if (entry && entry.visible) {
+                        entry.visible = false;
+                        leaderCanvasDirty = true;
+                    }
                 }
             });
+
+            drawDatablockLeaderLines();
+
+            if (revealLeaderCanvasAfterRender) {
+                leaderCanvasEl.style.visibility = '';
+                revealLeaderCanvasAfterRender = false;
+            }
 
             requestAnimationFrame(renderLoop);
         }
@@ -3624,6 +4274,9 @@
             const val = parseFloat(e.target.value);
             PREDICT_MINUTES = val;
             document.getElementById('predict-len-val').textContent = `${val.toFixed(2)} MIN`;
+            Object.values(aircraftState).forEach(state => {
+                state.lastPredictionUpdateTime = 0;
+            });
         });
 
         // Initialize Event Listeners for Simplified Hardware Source Switches
