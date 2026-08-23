@@ -1092,12 +1092,13 @@
            settings as a space-efficient bottom sheet. */
         @media (max-width: 600px), (orientation: portrait) and (max-width: 900px) {
             .radar-ui-wrapper {
-                top: 50%;
+                top: 0;
                 right: max(16px, env(safe-area-inset-right));
-                bottom: auto;
+                bottom: 0;
                 left: auto;
-                transform: translateY(-50%);
+                transform: none;
                 display: flex;
+                align-items: center;
                 z-index: 1000;
             }
 
