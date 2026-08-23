@@ -1155,22 +1155,6 @@
                 pointer-events: none !important;
             }
 
-            .radar-ui-panel {
-                position: fixed;
-                inset: auto max(8px, env(safe-area-inset-right))
-                    max(8px, env(safe-area-inset-bottom))
-                    max(8px, env(safe-area-inset-left));
-                width: auto;
-                max-height: min(70dvh, 560px);
-                transform: none;
-                border-radius: 14px;
-                z-index: 2;
-            }
-
-            @keyframes radarPanelIn {
-                from { opacity: 0; transform: translateY(12px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
         }
 
         /* Compact landscape: split the launcher into two edge rails so the
