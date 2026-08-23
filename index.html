@@ -526,6 +526,7 @@
             box-shadow: 0 12px 35px rgba(0,0,0,.35);
             backdrop-filter: blur(14px);
         }
+        .radar-launch-side { display: contents; }
 
         /* Dual-thumb altitude filters — preserved from the original radar UI */
         .radar-dual-slider {
@@ -1085,41 +1086,64 @@
             outline: none !important;
         }
 
-        /* Phone layout: keep the map full-screen while moving the launcher
-           and settings into thumb-friendly bottom controls. */
-        @media (max-width: 600px) {
+        .mobile-zoom-control { display: none; }
+
+        /* Phone layout: retain the original vertical launcher while presenting
+           settings as a space-efficient bottom sheet. */
+        @media (max-width: 600px), (orientation: portrait) and (max-width: 900px) {
             .radar-ui-wrapper {
-                top: auto;
-                right: max(8px, env(safe-area-inset-right));
-                bottom: max(8px, env(safe-area-inset-bottom));
-                left: max(8px, env(safe-area-inset-left));
-                transform: none;
-                display: block;
+                top: 50%;
+                right: max(16px, env(safe-area-inset-right));
+                bottom: auto;
+                left: auto;
+                transform: translateY(-50%);
+                display: flex;
+                z-index: 1000;
             }
 
             .radar-ui-launcher {
-                width: 100%;
-                box-sizing: border-box;
-                flex-direction: row;
+                width: auto;
+                flex-direction: column;
                 align-items: center;
-                justify-content: flex-start;
-                overflow-x: auto;
-                overflow-y: hidden;
-                scrollbar-width: none;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
             }
-
-            .radar-ui-launcher::-webkit-scrollbar { display: none; }
 
             .radar-launch-group {
                 display: flex;
+                flex-direction: column;
                 flex: none;
             }
 
             .radar-launch-btn {
-                width: 48px;
-                height: 44px;
+                width: 40px;
+                height: 36px;
                 flex: none;
+            }
+
+            .mobile-zoom-control {
+                display: block;
+                z-index: 700;
+                margin-left: max(8px, env(safe-area-inset-left)) !important;
+                margin-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+            }
+
+            .mobile-zoom-control a {
+                width: 44px !important;
+                height: 44px !important;
+                line-height: 44px !important;
+                font-size: 24px !important;
+                background: rgba(8, 10, 9, 0.88) !important;
+                color: #dce2de !important;
+                border-color: rgba(255,255,255,.10) !important;
+            }
+
+            /* Leaflet controls live in their own stacking context. Remove the
+               mobile zoom control while an overlay is open so it can never
+               paint or receive taps above a settings/detail popup. */
+            body:has(.radar-ui-panel.is-open) .mobile-zoom-control,
+            body:has(.aircraft-info-panel.open) .mobile-zoom-control {
+                visibility: hidden !important;
+                pointer-events: none !important;
             }
 
             .radar-ui-panel {
@@ -1131,12 +1155,50 @@
                 max-height: min(70dvh, 560px);
                 transform: none;
                 border-radius: 14px;
+                z-index: 2;
             }
 
             @keyframes radarPanelIn {
                 from { opacity: 0; transform: translateY(12px); }
                 to { opacity: 1; transform: translateY(0); }
             }
+        }
+
+        /* Compact landscape: split the launcher into two edge rails so the
+           controls do not form one viewport-height stack. */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .radar-ui-wrapper {
+                position: fixed;
+                inset: 0;
+                transform: none;
+                display: block;
+                pointer-events: none;
+            }
+
+            .radar-ui-launcher {
+                width: 100%;
+                height: 100%;
+                box-sizing: border-box;
+                padding: max(8px, env(safe-area-inset-top))
+                    max(16px, env(safe-area-inset-right))
+                    max(8px, env(safe-area-inset-bottom))
+                    max(16px, env(safe-area-inset-left));
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                pointer-events: none;
+            }
+
+            .radar-launch-side {
+                display: flex;
+                flex-direction: column;
+                gap: 7px;
+                pointer-events: auto;
+            }
+
+            .radar-launch-group { flex: none; }
+            .radar-ui-panel { pointer-events: auto; }
         }
 
 </style>
@@ -1147,24 +1209,28 @@
 
     <div class="radar-ui-wrapper" id="radar-ui-wrapper">
         <div class="radar-ui-launcher" id="radar-ui-launcher">
-            <div class="radar-launch-group">
+            <div class="radar-launch-side radar-launch-side-left">
+                <div class="radar-launch-group">
                 <button type="button" class="radar-launch-btn active" data-view-preset="APP" title="Approach view">APP</button>
                             <button type="button" class="radar-launch-btn" data-view-preset="TWR" title="Tower view">TWR</button>
                             <button type="button" class="radar-launch-btn" data-view-preset="GND" title="Ground view">GND</button>
-            </div>
-            <div class="radar-launch-group">
+                </div>
+                <div class="radar-launch-group">
                             <button type="button" class="radar-launch-btn rwy-pristine" id="rwy-direction-btn" title="Toggle runway direction">RWY<span>31</span></button>
-            </div>
-            <div class="radar-launch-group radar-search-group">
+                </div>
+                <div class="radar-launch-group radar-search-group">
                             <button type="button" class="radar-launch-btn radar-search-launch" id="radar-search-launch" data-panel="search" title="Search">SEARCH</button>
-                        </div>
-                        <div class="radar-launch-group">
+                </div>
+            </div>
+            <div class="radar-launch-side radar-launch-side-right">
+                <div class="radar-launch-group">
                             <button type="button" class="radar-launch-btn" data-panel="aircraft" title="Aircraft">ACFT</button>
                             <button type="button" class="radar-launch-btn" data-panel="map" title="Map">MAP</button>
                             <button type="button" class="radar-launch-btn" data-panel="procedures" title="Procedures">PROC</button>
                             <button type="button" class="radar-launch-btn" data-panel="weather" title="Weather">WXR</button>
                             <button type="button" class="radar-launch-btn" data-panel="airspaces" title="Airspaces">ASPC</button>
                             <button type="button" class="radar-launch-btn" data-panel="atc" title="ATC audio">ATC</button>
+                </div>
             </div>
         </div>
 
@@ -1625,6 +1691,11 @@
             // interactivity is lost.
             preferCanvas: true
         }).setView(INITIAL_VIEW_CENTER, INITIAL_VIEW_ZOOM);
+
+        // Keep the desktop radar chrome minimal, but expose large, familiar
+        // zoom buttons on phone-sized screens via the responsive stylesheet.
+        const mobileZoomControl = L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        mobileZoomControl.getContainer().classList.add('mobile-zoom-control');
 
         // Dedicated panes so ground-feature fills (aprons/taxiways/runway fills),
         // taxiway centerlines, and the bright runway centerlines stack in a
