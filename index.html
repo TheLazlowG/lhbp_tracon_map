@@ -4,7 +4,13 @@
     <meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<title>LHBP Radar</title>
-    <link rel="icon" href="./lhbp-radar-favicon.svg" type="image/svg+xml">
+    <meta name="theme-color" content="#080808">
+    <link rel="icon" href="./favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="./favicon-16x16.png" type="image/png" sizes="16x16">
+    <link rel="shortcut icon" href="./favicon.ico">
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="msapplication-config" content="./browserconfig.xml">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1090,7 +1096,9 @@
 
         /* Phone layout: retain the original vertical launcher while presenting
            settings as a space-efficient bottom sheet. */
-        @media (max-width: 600px), (orientation: portrait) and (max-width: 900px) {
+        @media (max-width: 600px),
+               (orientation: portrait) and (max-width: 900px),
+               (orientation: landscape) and (max-height: 600px) {
             .radar-ui-wrapper {
                 top: 0;
                 right: max(16px, env(safe-area-inset-right));
