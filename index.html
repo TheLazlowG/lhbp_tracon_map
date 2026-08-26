@@ -236,6 +236,113 @@
             border-color:rgba(103,232,90,.42);
             box-shadow:0 0 0 3px rgba(103,232,90,.06);
         }
+
+        /* Bottom toolbox: persistent search plus map measuring controls. */
+        .radar-toolbox {
+            position: fixed;
+            left: 50%;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            z-index: 1100;
+            display: flex;
+            align-items: stretch;
+            gap: 5px;
+            padding: 5px;
+            box-sizing: border-box;
+            background: rgba(8, 10, 9, 0.88);
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: 0 8px 24px rgba(0,0,0,.35);
+            backdrop-filter: blur(14px);
+            font-family: 'Google Sans Code', monospace;
+        }
+        .radar-toolbox-search {
+            width: clamp(150px, 24vw, 260px);
+            height: 36px;
+            margin: 0;
+        }
+        .radar-toolbox-btn {
+            height: 36px;
+            padding: 0 10px;
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.035);
+            color: #aeb6b1;
+            font: 700 10px 'Google Sans Code', monospace;
+            letter-spacing: .5px;
+            cursor: pointer;
+        }
+        .radar-toolbox-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,.07);
+            border-color: rgba(255,255,255,.18);
+        }
+        .radar-toolbox-btn.active {
+            color: #0b0d0c;
+            background: #ffe600;
+            border-color: #ffe600;
+        }
+        .radar-toolbox-clear {
+            display: none;
+            width: 36px;
+            padding: 0;
+            color: #ffe600;
+            font-size: 22px;
+            font-weight: 400;
+            line-height: 1;
+        }
+        .radar-toolbox.has-measurement .radar-toolbox-clear { display: block; }
+        .radar-measure-status {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 6px);
+            transform: translateX(-50%);
+            display: none;
+            width: max-content;
+            max-width: min(420px, calc(100vw - 24px));
+            padding: 6px 9px;
+            box-sizing: border-box;
+            background: rgba(8, 10, 9, .92);
+            border: 1px solid rgba(255, 230, 0, .35);
+            color: #ffe600;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.35;
+            text-align: center;
+            pointer-events: none;
+        }
+        .radar-toolbox.measuring .radar-measure-status,
+        .radar-toolbox.has-measurement .radar-measure-status { display: block; }
+        #radar-scope.measure-mode { cursor: crosshair; }
+        .radar-measure-path { pointer-events: none; }
+        .radar-measure-point-icon {
+            width: 9px;
+            height: 9px;
+            margin: -5px 0 0 -5px;
+            border: 1px solid #151515;
+            border-radius: 50%;
+            background: #ffe600;
+            box-shadow: 0 0 0 1px rgba(255,230,0,.45);
+        }
+        .radar-measure-label-icon {
+            width: auto !important;
+            height: auto !important;
+            margin: 0 !important;
+            pointer-events: none;
+        }
+        .radar-measure-label {
+            display: inline-block;
+            transform: translate(-50%, -50%);
+            width: max-content;
+            padding: 5px 7px;
+            background: rgba(8, 10, 9, .96);
+            border: 1px solid rgba(255,230,0,.55);
+            color: #ffe600;
+            font: 400 13px 'Google Sans Code', monospace;
+            line-height: 1.25;
+            white-space: nowrap;
+            text-shadow: 0 1px 2px #000;
+            box-shadow: 0 2px 9px rgba(0,0,0,.7);
+        }
+        .radar-measure-label.preview { border-style: dashed; }
         .radar-ui-title {
             font-size:10px;
             font-weight:700;
@@ -316,6 +423,10 @@
         .atc-label-clickable {
             pointer-events: auto !important;
             cursor: pointer;
+        }
+        .atc-label-clickable.datablock-hidden {
+            pointer-events: none !important;
+            cursor: default;
         }
 
         /* Aircraft Info Panel (opens on datablock click) */
@@ -748,8 +859,6 @@
         .airspace-matrix-check.static-cell:checked { border-color:#aaa; background:rgba(170,170,170,.12); color:#aaa; }
         .airspace-matrix-check.scheduled-cell:checked { border-color:#ffc107; background:rgba(255,193,7,.12); color:#ffc107; }
         .airspace-matrix-check.activated-cell:checked { border-color:#ff3b30; background:rgba(255,59,48,.12); color:#ff3b30; }
-        .radar-search-group { margin-bottom: 0; }
-        .radar-search-launch { font-size: 10px !important; letter-spacing: .4px; }
         .radar-panel-note {
             margin-top: 10px;
             padding: 9px 10px;
@@ -1129,6 +1238,13 @@
                 flex: none;
             }
 
+            .radar-toolbox {
+                bottom: max(8px, env(safe-area-inset-bottom));
+                max-width: calc(100vw - 16px);
+            }
+            .radar-toolbox-search { width: min(44vw, 190px); }
+            .radar-toolbox-btn { padding: 0 8px; }
+
             .mobile-zoom-control {
                 display: block;
                 z-index: 700;
@@ -1211,9 +1327,6 @@
                 <div class="radar-launch-group">
                             <button type="button" class="radar-launch-btn rwy-pristine" id="rwy-direction-btn" title="Toggle runway direction">RWY<span>31</span></button>
                 </div>
-                <div class="radar-launch-group radar-search-group">
-                            <button type="button" class="radar-launch-btn radar-search-launch" id="radar-search-launch" data-panel="search" title="Search">SEARCH</button>
-                </div>
             </div>
             <div class="radar-launch-side radar-launch-side-right">
                 <div class="radar-launch-group">
@@ -1225,14 +1338,6 @@
                             <button type="button" class="radar-launch-btn" data-panel="atc" title="ATC audio">ATC</button>
                 </div>
             </div>
-        </div>
-
-        <div class="radar-ui-panel" data-panel-view="search">
-            <div class="radar-panel-heading"><span>SEARCH</span><button type="button" class="radar-panel-close">×</button></div>
-            <div class="radar-search-container">
-                <input type="text" id="radar-search" class="radar-search-input" placeholder="FIND FIX / ACFT...">
-            </div>
-            <div class="radar-panel-note">Search aircraft, fixes and map objects.</div>
         </div>
 
         <div class="radar-ui-panel" data-panel-view="aircraft">
@@ -1351,6 +1456,10 @@
             <span class="aircraft-info-panel-row-value" id="aircraft-info-operator">--</span>
         </div>
         <div class="aircraft-info-panel-row">
+            <span class="aircraft-info-panel-row-label">Registered Owner</span>
+            <span class="aircraft-info-panel-row-value" id="aircraft-info-owner">--</span>
+        </div>
+        <div class="aircraft-info-panel-row">
             <span class="aircraft-info-panel-row-label">Type</span>
             <span class="aircraft-info-panel-row-value" id="aircraft-info-type">--</span>
         </div>
@@ -1363,10 +1472,17 @@
             <span class="aircraft-info-panel-row-value" id="aircraft-info-squawk">--</span>
         </div>
     </div>
+    <div class="radar-toolbox" id="radar-toolbox" role="toolbar" aria-label="Map tools">
+        <input type="search" id="radar-search" class="radar-search-input radar-toolbox-search" placeholder="FIND FIX / ACFT..." aria-label="Search aircraft and fixes">
+        <button type="button" class="radar-toolbox-btn" id="radar-measure-btn" aria-pressed="false" title="Measure multiple map segments">MEASURE</button>
+        <button type="button" class="radar-toolbox-btn radar-toolbox-clear" id="radar-measure-clear" title="Clear measurement" aria-label="Clear measurement">×</button>
+        <div class="radar-measure-status" id="radar-measure-status" aria-live="polite">SELECT MEASURE, THEN CLICK THE MAP</div>
+    </div>
     <div id="radar-scope"></div>
     <canvas id="datablock-leader-canvas"></canvas>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="data/icao-registration-countries.js"></script>
     <script>
         // ---------------------------------------------------------------
         // LABEL EDITOR MODE
@@ -1607,6 +1723,7 @@
         const AIRLINE_TELEPHONY = {
 		"JSD":"ALPOK","SXS":"SUNEXPRESS","AFR":"AIR FRANCE"
         };
+        const AIRLINE_DIRECTORY = {};
 
         // Asynchronously fetch and map thousands of dynamic airline designators on application startup
         async function initAirlineDatabase() {
@@ -1619,6 +1736,8 @@
                 // { "AAD": { "callsign": "PANABEAR", "company": "...", "country": "..." }, ... }
                 Object.keys(data).forEach(icaoKey => {
                     const entry = data[icaoKey];
+                    const key = icaoKey.toUpperCase().trim();
+                    AIRLINE_DIRECTORY[key] = entry;
                     // The database signals "no telephony designator known" as
                     // the literal string "(None)" (parentheses included).
                     // Strip any surrounding parens before comparing so this
@@ -1627,7 +1746,6 @@
                         ? entry.callsign.trim().toUpperCase().replace(/^\(|\)$/g, '')
                         : '';
                     if (entry && entry.callsign && normalizedCallsign !== "NONE") {
-                        const key = icaoKey.toUpperCase().trim();
                         // Prefer predefined script callsigns if they already exist
                         if (!AIRLINE_TELEPHONY[key]) {
                             AIRLINE_TELEPHONY[key] = entry.callsign.toUpperCase().trim();
@@ -1638,6 +1756,25 @@
             } catch (err) {
                 console.warn("Local callsign directory (data/callsigns.json) unresolvable, relying on expanded core cache:", err);
             }
+        }
+
+        function getAirlineOperator(callsign) {
+            const normalized = String(callsign || '').trim().toUpperCase();
+            // Airline flight identifiers normally begin with a three-letter
+            // ICAO designator followed by a flight number. Requiring a digit
+            // avoids treating registration-like callsigns as airline flights.
+            if (!/^[A-Z]{3}(?=.*\d)/.test(normalized)) return '';
+            const entry = AIRLINE_DIRECTORY[normalized.substring(0, 3)];
+            if (!entry || !entry.company) return '';
+            const company = String(entry.company).trim();
+            return /^\(?none\)?$/i.test(company) ? '' : company;
+        }
+
+        function getRegistrationCountry(hex) {
+            const normalized = String(hex || '').trim().toLowerCase();
+            if (!/^[0-9a-f]{6}$/.test(normalized) || typeof findICAORange !== 'function') return '';
+            const range = findICAORange(normalized);
+            return range && range.country !== 'Unassigned' ? range.country : '';
         }
 
         // Helper function to format short ICAO callsign to controller spoken telephony
@@ -1689,6 +1826,231 @@
         // zoom buttons on phone-sized screens via the responsive stylesheet.
         const mobileZoomControl = L.control.zoom({ position: 'bottomleft' }).addTo(map);
         mobileZoomControl.getContainer().classList.add('mobile-zoom-control');
+
+        // Multi-segment tape measure. Declination at LHBP is fixed at 6°E:
+        // magnetic heading = true heading - easterly declination.
+        const MAGNETIC_DECLINATION_DEGREES = 6;
+        const METERS_PER_NAUTICAL_MILE = 1852;
+        const measureToolbox = document.getElementById('radar-toolbox');
+        const measureButton = document.getElementById('radar-measure-btn');
+        const measureClearButton = document.getElementById('radar-measure-clear');
+        const measureStatus = document.getElementById('radar-measure-status');
+        map.createPane('measurePane');
+        map.getPane('measurePane').style.zIndex = 760;
+        map.getPane('measurePane').style.pointerEvents = 'none';
+        const measureLayers = L.layerGroup().addTo(map);
+        let measureActive = false;
+        let measurePoints = [];
+        let measureTotalNM = 0;
+        let measurePath = null;
+        let measurePreviewPath = null;
+        let measurePreviewLabel = null;
+        let restoreMeasureDoubleClickZoom = false;
+
+        function normalizedHeading(degrees) {
+            return (degrees % 360 + 360) % 360;
+        }
+
+        function formatHeading(degrees) {
+            return String(Math.round(normalizedHeading(degrees)) % 360).padStart(3, '0');
+        }
+
+        function trueBearingDegrees(start, end) {
+            const lat1 = start.lat * Math.PI / 180;
+            const lat2 = end.lat * Math.PI / 180;
+            const deltaLon = (end.lng - start.lng) * Math.PI / 180;
+            const y = Math.sin(deltaLon) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) -
+                Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+            return normalizedHeading(Math.atan2(y, x) * 180 / Math.PI);
+        }
+
+        function measureSegmentData(start, end) {
+            const distanceNM = map.distance(start, end) / METERS_PER_NAUTICAL_MILE;
+            const trueHeading = trueBearingDegrees(start, end);
+            const magneticHeading = normalizedHeading(trueHeading - MAGNETIC_DECLINATION_DEGREES);
+            return {
+                distanceNM,
+                label: `${distanceNM.toFixed(2)} NM · ${formatHeading(trueHeading)}°T / ${formatHeading(magneticHeading)}°M`
+            };
+        }
+
+        function measureMidpoint(start, end) {
+            return L.latLng((start.lat + end.lat) / 2, (start.lng + end.lng) / 2);
+        }
+
+        function hideMeasurePreview() {
+            if (measurePreviewPath) measureLayers.removeLayer(measurePreviewPath);
+            if (measurePreviewLabel) measureLayers.removeLayer(measurePreviewLabel);
+            measurePreviewPath = null;
+            measurePreviewLabel = null;
+        }
+
+        function setMeasureActive(active) {
+            measureActive = active;
+            if (active) {
+                restoreMeasureDoubleClickZoom = map.doubleClickZoom.enabled();
+                map.doubleClickZoom.disable();
+            } else {
+                hideMeasurePreview();
+                if (restoreMeasureDoubleClickZoom) map.doubleClickZoom.enable();
+                restoreMeasureDoubleClickZoom = false;
+            }
+            measureButton.classList.toggle('active', active);
+            measureButton.setAttribute('aria-pressed', String(active));
+            measureButton.textContent = active ? 'DONE' : 'MEASURE';
+            measureToolbox.classList.toggle('measuring', active);
+            document.getElementById('radar-scope').classList.toggle('measure-mode', active);
+            if (active) {
+                measureStatus.textContent = measurePoints.length
+                    ? 'CLICK MAP TO ADD ANOTHER SEGMENT'
+                    : 'CLICK MAP TO SET THE START POINT';
+            } else if (!measurePoints.length) {
+                measureStatus.textContent = 'SELECT MEASURE, THEN CLICK THE MAP';
+            }
+        }
+
+        function updateMeasureStatus() {
+            const segmentCount = Math.max(0, measurePoints.length - 1);
+            measureToolbox.classList.toggle('has-measurement', measurePoints.length > 0);
+            if (segmentCount) {
+                measureStatus.textContent = `${segmentCount} SEG${segmentCount === 1 ? '' : 'S'} · TOTAL ${measureTotalNM.toFixed(2)} NM${measureActive ? ' · CLICK TO ADD' : ''}`;
+            } else if (measurePoints.length) {
+                measureStatus.textContent = measureActive ? 'START SET · CLICK MAP FOR NEXT POINT' : 'START POINT SET';
+            }
+        }
+
+        function clearMeasurement() {
+            measureLayers.clearLayers();
+            measurePoints = [];
+            measureTotalNM = 0;
+            measurePath = null;
+            measurePreviewPath = null;
+            measurePreviewLabel = null;
+            measureToolbox.classList.remove('has-measurement');
+            measureStatus.textContent = measureActive
+                ? 'CLICK MAP TO SET THE START POINT'
+                : 'SELECT MEASURE, THEN CLICK THE MAP';
+        }
+
+        measureButton.addEventListener('click', function() {
+            setMeasureActive(!measureActive);
+            updateMeasureStatus();
+        });
+
+        measureClearButton.addEventListener('click', clearMeasurement);
+
+        map.on('mousemove', function(e) {
+            if (!measureActive || !measurePoints.length) return;
+
+            const start = measurePoints[measurePoints.length - 1];
+            const end = e.latlng;
+            const segment = measureSegmentData(start, end);
+            const midpoint = measureMidpoint(start, end);
+
+            if (!measurePreviewPath) {
+                measurePreviewPath = L.polyline([start, end], {
+                    pane: 'measurePane',
+                    color: '#ffe600',
+                    weight: 2,
+                    opacity: .9,
+                    interactive: false,
+                    className: 'radar-measure-path'
+                }).addTo(measureLayers);
+            } else {
+                measurePreviewPath.setLatLngs([start, end]);
+            }
+
+            const previewIcon = L.divIcon({
+                className: 'radar-measure-label-icon',
+                html: `<span class="radar-measure-label preview">${segment.label}</span>`,
+                iconSize: null
+            });
+            if (!measurePreviewLabel) {
+                measurePreviewLabel = L.marker(midpoint, {
+                    pane: 'measurePane',
+                    interactive: false,
+                    keyboard: false,
+                    icon: previewIcon
+                }).addTo(measureLayers);
+            } else {
+                measurePreviewLabel.setLatLng(midpoint);
+                measurePreviewLabel.setIcon(previewIcon);
+            }
+
+            measureStatus.textContent = `NEXT ${segment.label} · TOTAL ${(measureTotalNM + segment.distanceNM).toFixed(2)} NM`;
+        });
+
+        map.on('mouseout', function() {
+            if (!measureActive || !measurePoints.length) return;
+            hideMeasurePreview();
+            updateMeasureStatus();
+        });
+
+        map.on('click', function(e) {
+            if (!measureActive) return;
+
+            const nextPoint = e.latlng;
+            const previousPoint = measurePoints[measurePoints.length - 1];
+            if (previousPoint) {
+                const previousPixel = map.latLngToContainerPoint(previousPoint);
+                const nextPixel = map.latLngToContainerPoint(nextPoint);
+                if (previousPixel.distanceTo(nextPixel) < 4) return;
+            }
+            hideMeasurePreview();
+            measurePoints.push(nextPoint);
+
+            L.marker(nextPoint, {
+                pane: 'measurePane',
+                interactive: false,
+                keyboard: false,
+                icon: L.divIcon({ className: '', html: '<div class="radar-measure-point-icon"></div>', iconSize: [1, 1] })
+            }).addTo(measureLayers);
+
+            if (!measurePath) {
+                measurePath = L.polyline(measurePoints, {
+                    pane: 'measurePane',
+                    color: '#ffe600',
+                    weight: 2,
+                    opacity: 1,
+                    interactive: false,
+                    className: 'radar-measure-path'
+                }).addTo(measureLayers);
+            } else {
+                measurePath.setLatLngs(measurePoints);
+            }
+
+            if (previousPoint) {
+                const segment = measureSegmentData(previousPoint, nextPoint);
+                measureTotalNM += segment.distanceNM;
+                L.marker(measureMidpoint(previousPoint, nextPoint), {
+                    pane: 'measurePane',
+                    interactive: false,
+                    keyboard: false,
+                    icon: L.divIcon({
+                        className: 'radar-measure-label-icon',
+                        html: `<span class="radar-measure-label">${segment.label}</span>`,
+                        iconSize: null
+                    })
+                }).addTo(measureLayers);
+            }
+
+            updateMeasureStatus();
+        });
+
+        map.on('dblclick', function(e) {
+            if (!measureActive) return;
+            if (e.originalEvent) L.DomEvent.preventDefault(e.originalEvent);
+            setMeasureActive(false);
+            updateMeasureStatus();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && measureActive) {
+                setMeasureActive(false);
+                updateMeasureStatus();
+            }
+        });
 
         // Dedicated panes so ground-feature fills (aprons/taxiways/runway fills),
         // taxiway centerlines, and the bright runway centerlines stack in a
@@ -2902,10 +3264,11 @@
         // per visible aircraft per frame. Datablocks instead live as stable
         // DOM nodes in the dedicated pane and move solely through a compositor-
         // friendly transform; the small API mirrors the methods used below.
-        function createAircraftDatablock() {
+        function createAircraftDatablock(id) {
             const element = document.createElement('div');
-            element.className = 'leaflet-tooltip leaflet-zoom-animated leaflet-tooltip-right atc-label atc-label-clickable';
+            element.className = 'leaflet-tooltip leaflet-zoom-animated leaflet-tooltip-right atc-label atc-label-clickable datablock-hidden';
             element.style.opacity = '0';
+            element.setAttribute('aria-hidden', 'true');
             element.style.willChange = 'transform';
             map.getPane('datablockPane').appendChild(element);
 
@@ -2935,6 +3298,17 @@
                 if (nextHalfHeight === halfHeightPx) return;
                 halfHeightPx = nextHalfHeight;
                 applyPixelSnappedPosition();
+
+                // The content-height change moves the actual top-left corner
+                // even though the datablock's geographic anchor is unchanged.
+                // Invalidate this pair's cached DOM geometry so its leader is
+                // remeasured on the next render instead of retaining the old
+                // (slightly lower) endpoint until another traffic update.
+                const leaderEntry = datablockLeaderLines.get(id);
+                if (leaderEntry) {
+                    leaderEntry.measuredGeometryEpoch = -1;
+                    leaderCanvasDirty = true;
+                }
             });
             sizeObserver.observe(element);
 
@@ -2966,6 +3340,9 @@
                     if (opacity !== nextOpacity) {
                         opacity = nextOpacity;
                         element.style.opacity = String(nextOpacity);
+                        const isHidden = nextOpacity <= 0;
+                        element.classList.toggle('datablock-hidden', isHidden);
+                        element.setAttribute('aria-hidden', String(isHidden));
                     }
                     return this;
                 },
@@ -3151,16 +3528,21 @@
 
         const aircraftMetadataCache = new Map();
 
-        async function fetchAircraftMetadata(hex) {
+        async function fetchAircraftMetadata(hex, callsign) {
             if (!hex) return null;
 
-            const key = String(hex).trim().toLowerCase();
+            const normalizedHex = String(hex).trim().toLowerCase();
+            const normalizedCallsign = String(callsign || '').trim().toUpperCase();
+            const key = `${normalizedHex}|${normalizedCallsign}`;
             if (aircraftMetadataCache.has(key)) {
                 return aircraftMetadataCache.get(key);
             }
 
+            const callsignQuery = normalizedCallsign
+                ? `?callsign=${encodeURIComponent(normalizedCallsign)}`
+                : '';
             const promise = fetch(
-                `https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(key)}`,
+                `https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(normalizedHex)}${callsignQuery}`,
                 {
                     cache: 'force-cache',
                     headers: { 'Accept': 'application/json' }
@@ -3171,10 +3553,15 @@
                         throw new Error(`ADSBdb HTTP ${response.status}`);
                     }
                     const data = await response.json();
-                    return data?.response?.aircraft || null;
+                    return data && typeof data.response === 'object'
+                        ? data.response
+                        : null;
                 })
                 .catch(error => {
                     console.warn('Aircraft metadata lookup failed:', error);
+                    // Do not retain a rejected/failed lookup for the whole
+                    // page lifetime; a later panel open may retry it.
+                    aircraftMetadataCache.delete(key);
                     return null;
                 });
 
@@ -3186,23 +3573,24 @@
             const state = aircraftState[id];
             if (!state) return;
 
-            const metadata = await fetchAircraftMetadata(id);
+            const requestedCallsign = String(state.callsign || '').trim().toUpperCase();
+            const metadata = await fetchAircraftMetadata(id, requestedCallsign);
             if (!metadata || !aircraftState[id]) return;
 
             const current = aircraftState[id];
+            const aircraftMetadata = metadata.aircraft || null;
+            const airlineMetadata = metadata.flightroute?.airline || null;
 
-            // ADSBdb fields:
-            // registered_owner_country_name = registration country
-            // registered_owner             = registered operator/owner
-            current.country =
-                metadata.registered_owner_country_name ||
-                current.country ||
-                '';
-
-            current.operator =
-                metadata.registered_owner ||
-                current.operator ||
-                '';
+            // Keep flight operator and registered owner separate. Country is
+            // derived from the ICAO address allocation, not owner metadata.
+            if (airlineMetadata?.name && String(current.callsign || '').trim().toUpperCase() === requestedCallsign) {
+                current.metadataOperator = airlineMetadata.name;
+                current.operator = current.operator || airlineMetadata.name;
+            }
+            if (aircraftMetadata?.registered_owner) {
+                current.metadataRegisteredOwner = aircraftMetadata.registered_owner;
+                current.registeredOwner = aircraftMetadata.registered_owner;
+            }
 
             if (openAircraftInfoId === id) {
                 renderAircraftInfoPanel(id);
@@ -3224,6 +3612,9 @@
 
             document.getElementById('aircraft-info-operator').textContent =
                 state.operator || 'UNKNOWN';
+
+            document.getElementById('aircraft-info-owner').textContent =
+                state.registeredOwner || 'UNKNOWN';
 
             aircraftInfoTypeEl.textContent =
                 state.actype || 'UNK';
@@ -3392,6 +3783,10 @@
                 registration: "",
                 country: "",
                 operator: "",
+                operatorCallsign: "",
+                metadataOperator: "",
+                registeredOwner: "",
+                metadataRegisteredOwner: "",
                 typeName: "",
 
 
@@ -3424,7 +3819,7 @@
                 ui: {
                     marker: L.marker([0, 0], { icon: targetDivIcon, interactive: true, opacity: 0, pane: 'aircraftPane' }),
                     speedLine: L.polyline([[0,0],[0,0]], { color: '#5DEB3D', weight: 1.8, opacity: 1, interactive: false, pane: 'aircraftPane' }),
-                    dataBlock: createAircraftDatablock()
+                    dataBlock: createAircraftDatablock(id)
                 }
             };
             const ui = aircraftState[id].ui;
@@ -3488,12 +3883,18 @@
                     initAircraftState(t.id, t.call, t.srcType);
                 }
                 const state = aircraftState[t.id];
+                const normalizedCallsign = String(t.call || '').trim().toUpperCase();
+                if (state.operatorCallsign !== normalizedCallsign) {
+                    state.operatorCallsign = normalizedCallsign;
+                    state.metadataOperator = "";
+                }
                 state.callsign = t.call;
                 state.actype = t.type || "UNK";
                 state.wake = t.wake || "";
                 state.registration = t.reg || "";
                 state.country = t.country || state.country || "";
-                state.operator = t.operator || state.operator || "";
+                state.operator = t.operator || state.metadataOperator || "";
+                state.registeredOwner = state.metadataRegisteredOwner || t.registeredOwner || state.registeredOwner || "";
                 state.typeName = t.typeName || "";
                 state.squawk = t.squawk || "";
                 state.selectedAltitude = t.selectedAlt ?? null;
@@ -4275,8 +4676,9 @@
                     type: ac.t ? ac.t.trim().toUpperCase() : 'UNK',
                     wake: ac.category ? String(ac.category).trim().toUpperCase() : '',
                     reg: ac.r ? ac.r.trim().toUpperCase() : '',
-                    country: ac.registered_owner_country_name || '',
-                    operator: ac.ownOp || '',
+                    country: getRegistrationCountry(ac.hex || ac.icao),
+                    operator: getAirlineOperator(ac.flight),
+                    registeredOwner: ac.ownOp || '',
                     typeName: ac.desc || '',
 
 
