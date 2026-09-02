@@ -15,8 +15,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
 		html, body { width: 100%; height: 100%; }
-		body { margin: 0; background-color: #000; overflow: hidden; }
+        body { margin: 0; background-color: #000; overflow: hidden; }
         #radar-scope { width: 100%; height: 100vh; height: 100dvh; background: #000; }
+
+        #radar-scope .leaflet-control-attribution {
+            padding: 2px 5px;
+            background: rgba(0, 0, 0, 0.82);
+            color: #aeb6b1;
+        }
+        #radar-scope .leaflet-control-attribution a {
+            color: #d7ddd9;
+        }
 
         /* Datablock leader-line canvas. Each leader is geometrically split
            around only its own datablock row rectangles, then all visible
@@ -1808,7 +1817,7 @@
         const INITIAL_VIEW_ZOOM = APP_VIEW_ZOOM;
         const map = L.map('radar-scope', {
             zoomControl: false,
-            attributionControl: false,
+            attributionControl: true,
             // Canvas rendering is dramatically cheaper than the SVG default
             // once you have thousands of polygon vertices on screen at once
             // (ground features + airspaces + taxiway lines add up to ~12,000
@@ -1826,6 +1835,19 @@
         // zoom buttons on phone-sized screens via the responsive stylesheet.
         const mobileZoomControl = L.control.zoom({ position: 'bottomleft' }).addTo(map);
         mobileZoomControl.getContainer().classList.add('mobile-zoom-control');
+
+        // Leaflet caches the map container dimensions. Mobile orientation and
+        // browser-chrome changes update 100dvh without necessarily producing a
+        // Leaflet resize, leaving the projection centered on the old portrait
+        // height. Observe the actual scope and resynchronize on the next frame.
+        let mapResizeFrame = 0;
+        const mapSizeObserver = new ResizeObserver(() => {
+            cancelAnimationFrame(mapResizeFrame);
+            mapResizeFrame = requestAnimationFrame(() => {
+                map.invalidateSize({ animate: false, pan: true, debounceMoveend: true });
+            });
+        });
+        mapSizeObserver.observe(document.getElementById('radar-scope'));
 
         // Multi-segment tape measure. Declination at LHBP is fixed at 6°E:
         // magnetic heading = true heading - easterly declination.
@@ -2130,9 +2152,18 @@
             map.getPane('editorLabelsPane').style.zIndex = 5000;
         }
         
-        // Define CartoDB Basemap Variants (With Labels & No Labels)
-        const darkAllWithLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
-        const darkAllNoLabels   = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png');
+        // Define CARTO raster basemap variants (with labels and without labels).
+        // CARTO basemap keys are intentionally browser-visible identifiers used
+        // in each client-side tile request, rather than server-side secrets.
+        const CARTO_BASEMAP_KEY = 'cb1_2qfg_1_ef21cddc70e867a689fe0ca1';
+        const cartoAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+        const cartoTileOptions = {
+            attribution: cartoAttribution,
+            subdomains: 'abcd',
+            maxZoom: 20
+        };
+        const darkAllWithLabels = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_BASEMAP_KEY}`, cartoTileOptions);
+        const darkAllNoLabels   = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${CARTO_BASEMAP_KEY}`, cartoTileOptions);
 
         const basemapEnabledInput = document.getElementById('basemap-enabled');
         const mapLabelsInput = document.getElementById('map-labels');
