@@ -406,14 +406,14 @@
             padding:0 9px;
             box-sizing:border-box;
             border:1px solid rgba(255,255,255,.075);
-            border-radius:7px;
+            border-radius:0;
             background:rgba(255,255,255,.025);
             color:#999;
             font-family:'Google Sans Code',monospace;
-            font-size:10px;
+            font-size:11px;
             text-decoration:none;
         }
-        .radar-atc-link:hover { border-color:rgba(103,232,90,.28); background:rgba(103,232,90,.045); color:#fff; }
+        .radar-atc-link:hover { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#e4e9e5; }
         .radar-atc-link-all { color:#5DEB3D; border-color:rgba(103,232,90,.24); background:rgba(103,232,90,.08); }
 
         /* ATC Target Label (Datablock) */
@@ -906,6 +906,7 @@
         .radar-slider-row,
         .radar-ui-section-card,
         .radar-radio-row,
+        .radar-atc-link,
         .radar-panel-note {
             border-radius: 0 !important;
         }
@@ -1183,7 +1184,8 @@
 
 
         /* Settings panel close controls: simple, larger X with no button chrome. */
-        .radar-ui-panel .radar-panel-close {
+        .radar-ui-panel .radar-panel-close,
+        .aircraft-info-panel-close {
             width: auto !important;
             height: auto !important;
             min-width: 0 !important;
@@ -1202,7 +1204,10 @@
 
         .radar-ui-panel .radar-panel-close:hover,
         .radar-ui-panel .radar-panel-close:focus,
-        .radar-ui-panel .radar-panel-close:active {
+        .radar-ui-panel .radar-panel-close:active,
+        .aircraft-info-panel-close:hover,
+        .aircraft-info-panel-close:focus,
+        .aircraft-info-panel-close:active {
             border: none !important;
             background: transparent !important;
             box-shadow: none !important;
@@ -1434,6 +1439,7 @@
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_app_123860&icao=lhbp" data-atc-popup>APP (123.860)</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_dir_119510&icao=lhbp" data-atc-popup>DIR (119.510)</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_twr_118715&icao=lhbp" data-atc-popup>TWR (118.715)</a>
+                <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_gnd&icao=lhbp" data-atc-popup>GND (121.910)</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_info_119350&icao=lhbp" data-atc-popup>INFO (119.350)</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp_atis&icao=lhbp" data-atc-popup>ATIS</a>
                 <a class="radar-atc-link" href="https://www.liveatc.net/hlisten.php?mount=lhbp1_2&icao=lhbp" data-atc-popup>TWR/INFO</a>
@@ -1445,7 +1451,7 @@
     <div id="aircraft-info-panel" class="aircraft-info-panel">
         <div class="aircraft-info-panel-header">
             <span class="aircraft-info-panel-callsign" id="aircraft-info-callsign">--</span>
-            <span class="aircraft-info-panel-close" id="aircraft-info-close">&times;</span>
+            <button type="button" class="aircraft-info-panel-close" id="aircraft-info-close" aria-label="Close aircraft information">&times;</button>
         </div>
         <div class="aircraft-info-panel-photo-wrap" id="aircraft-info-photo-wrap">
             <span class="aircraft-info-panel-photo-placeholder" id="aircraft-info-photo-placeholder">NO PHOTO</span>
@@ -2299,11 +2305,11 @@
         const tickLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6, interactive: false };
         const majorTickLineStyle = { color: '#ffffff', weight: 2, opacity: 0.8, interactive: false };
         
-        const sid31Style = { color: '#ffffff', weight: 1.5, dashArray: '6, 4', opacity: 0.6, interactive: false };
-        const sid13Style = { color: '#ffffff', weight: 1.5, dashArray: '2, 3', opacity: 0.7, interactive: false };
-        const star31Style = { color: '#ffffff', weight: 1.5, dashArray: '10, 4, 2, 4', opacity: 0.6, interactive: false };
-        const star13Style = { color: '#ffffff', weight: 1.5, dashArray: '15, 5', opacity: 0.5, interactive: false };
-        const holdingStyle = { color: '#ffffff', weight: 1.5, opacity: 0.4, interactive: false };
+        const sid31Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
+        const sid13Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
+        const star31Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
+        const star13Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
+        const holdingStyle = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
 
         // Airspace boundary styles. Preserves the existing visual language
         // (red outlines for the highest-significance categories, neutral
@@ -3204,14 +3210,14 @@
 			L.polyline([wp["BP755"], wp["BP756"], wp["TORAZ"]], star13Style).addTo(star13Group);
 			L.polyline([wp["BP765"], wp["BP766"], wp["GIFRA"]], star13Style).addTo(star13Group);
 
-            buildHoldingPattern("JOZEP", 100, true);
-            buildHoldingPattern("HUZTA", 310, false);
-            buildHoldingPattern("ALZUR", 310, true);   
-            buildHoldingPattern("LAHOR", 230, false);
-            buildHoldingPattern("TPS",   246, false);
-            buildHoldingPattern("WONTA", 130, true);   
-            buildHoldingPattern("UTCON", 130, false);
-            buildHoldingPattern("ZURFA", 310, false);
+            buildHoldingPattern("JOZEP", 102, true);
+            buildHoldingPattern("HUZTA", 312, false);
+            buildHoldingPattern("ALZUR", 312, true);   
+            buildHoldingPattern("LAHOR", 232, false);
+            buildHoldingPattern("TPS",   248, false);
+            buildHoldingPattern("WONTA", 132, true);   
+            buildHoldingPattern("UTCON", 132, false);
+            buildHoldingPattern("ZURFA", 312, false);
         }
         
         // ==========================================
@@ -6720,6 +6726,7 @@
 
 
         async function bootApp() {
+            console.log('Data is in accordance with AIRAC AMDT 006/2026: https://ais.hungarocontrol.hu/aip/2026-09-03/');
             await initWaypointsAndProcedures();
             await initAirlineDatabase(); 
             await loadGroundFeatures();
