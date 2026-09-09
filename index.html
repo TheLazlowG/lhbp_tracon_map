@@ -614,7 +614,7 @@
         /* Same issue, different pane: SID/STAR procedures, runway
            extension/tick lines, and holding patterns render onto
            Leaflet's default overlayPane (no explicit pane option), which
-           sits directly above airspacePane (395 vs 400) and also gets a
+           sits directly above the airspace panes (394-397 vs 400) and gets a
            full-viewport canvas. Its content is now interactive:false at
            the layer level (see sid31Style etc.), but this CSS rule is
            kept as a second guard so nothing else added to this pane
@@ -1817,13 +1817,16 @@
         const INITIAL_VIEW_CENTER = [47.4369, 19.2556];
         // View presets, by zoom level: APP (approach/TMA-scale overview) <
         // TWR (tower/airport-scale) < GND (ground/apron-scale, closest zoom).
-        const APP_VIEW_ZOOM = 9.5;
-        const TWR_VIEW_ZOOM = 12.5;
-        const GND_VIEW_ZOOM = 14.5;
+        const APP_VIEW_ZOOM = 10;
+        const TWR_VIEW_ZOOM = 13;
+        const GND_VIEW_ZOOM = 15;
         const INITIAL_VIEW_ZOOM = APP_VIEW_ZOOM;
         const map = L.map('radar-scope', {
             zoomControl: false,
             attributionControl: true,
+            zoomSnap: 1,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 360,
             // Canvas rendering is dramatically cheaper than the SVG default
             // once you have thousands of polygon vertices on screen at once
             // (ground features + airspaces + taxiway lines add up to ~12,000
@@ -2085,8 +2088,9 @@
         // fixed, predictable order regardless of the order layers are added or
         // re-added (e.g. toggling the "GROUND FEATURES" checkbox off/on):
         //   basemap (200) < apronsPane (340) < taxiwaysFillPane (345) < runwayFillPane (350)
-        //   < taxiwayLinesPane (380) < runwayLinesPane (390) < overlayPane (400, default:
-        //   waypoints/SID-STAR/airspaces/etc.) < ... < markerPane (600, default) <
+        //   < taxiwayLinesPane (380) < runwayLinesPane (390) < static airspaces (394/395)
+        //   < LARA/FUA airspaces (396/397) < overlayPane (400, default: waypoints,
+        //   SID/STAR, etc.) < ... < markerPane (600, default) <
         //   tooltipPane (650, default) < aircraftPane (700, traffic: position dots,
         //   speed vectors, leader lines, data blocks, history trail dots) <
         //   datablockPane (710) < airspaceInfoTooltipPane (720, AIRSPACE INFO's
@@ -2102,14 +2106,21 @@
         map.getPane('taxiwayLinesPane').style.zIndex = 380;
         map.createPane('runwayLinesPane');
         map.getPane('runwayLinesPane').style.zIndex = 390;
-        // Airspaces must render below SID/STAR procedures.
+        // Airspaces must render below SID/STAR procedures, while genuine
+        // LARA/FUA records must always sit above static airspaces regardless
+        // of fetch, refresh, filter-toggle, or LayerGroup insertion order.
         // SID/STAR remain on Leaflet's default overlayPane (z-index 400).
         map.createPane('airspacePane');
-        map.getPane('airspacePane').style.zIndex = 395;
+        map.getPane('airspacePane').style.zIndex = 394;
 
-        // Airspace labels use the same pane so they stay below SID/STAR too.
+        // Keep each label directly above its own class of polygon. This also
+        // ensures a LARA/FUA polygon and label both outrank static content.
         map.createPane('airspaceLabelPane');
         map.getPane('airspaceLabelPane').style.zIndex = 395;
+        map.createPane('laraFuaAirspacePane');
+        map.getPane('laraFuaAirspacePane').style.zIndex = 396;
+        map.createPane('laraFuaAirspaceLabelPane');
+        map.getPane('laraFuaAirspaceLabelPane').style.zIndex = 397;
 
 
         map.createPane('aircraftPane');
@@ -2117,7 +2128,7 @@
         // aircraftPane's Canvas renderer draws a full-viewport <canvas>
         // even where nothing is drawn, and that canvas was the topmost
         // element under the cursor everywhere on the map (aircraftPane
-        // sits above every other pane, incl. airspacePane at 395),
+        // sits above every airspace pane, whose highest z-index is 397),
         // silently swallowing all mouse events -- including airspace
         // hover -- map-wide, even far from any aircraft. The
         // .leaflet-aircraft-pane canvas rule in the stylesheet sets
@@ -2305,10 +2316,10 @@
         const tickLineStyle = { color: '#ffffff', weight: 1.5, opacity: 0.6, interactive: false };
         const majorTickLineStyle = { color: '#ffffff', weight: 2, opacity: 0.8, interactive: false };
         
-        const sid31Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
-        const sid13Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
-        const star31Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
-        const star13Style = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
+        const sid31Style = { color: '#ffffff', weight: 1, dashArray: '3, 4', opacity: 0.7, interactive: false };
+        const sid13Style = { color: '#ffffff', weight: 1, dashArray: '3, 4', opacity: 0.7, interactive: false };
+        const star31Style = { color: '#ffffff', weight: 1, dashArray: '8, 4', opacity: 0.7, interactive: false };
+        const star13Style = { color: '#ffffff', weight: 1, dashArray: '8, 4', opacity: 0.7, interactive: false };
         const holdingStyle = { color: '#ffffff', weight: 1, dashArray: '6, 4', opacity: 0.7, interactive: false };
 
         // Airspace boundary styles. Preserves the existing visual language
@@ -2328,7 +2339,7 @@
             // airspaceStyleDefault until its styling is revisited.
             'FIR': { color: '#9E9E9E', weight: 1.4, opacity: 0.55, fill: false },
         };
-        const airspaceStyleDefault = { color: '#9E9E9E', weight: 1, opacity: 0.45, fill: false };
+        const airspaceStyleDefault = { color: '#9E9E9E', weight: 1, opacity: 0.8, fill: false };
 
         // LARA_FUA overlays are independent of the static airspace styling
         // above -- drawn as separate overlay polygons per spec, not merged
@@ -5317,6 +5328,21 @@
                 return active ? laraFuaActiveStyle : laraFuaPublishedStyle;
             }
 
+            // Pane selection is based on actual LARA/FUA data, not on the
+            // current filter/highlight state. A matched record can temporarily
+            // fall back to its static style when Published/Activated is hidden,
+            // but once highlighted again it must already be in the guaranteed
+            // upper pane. P/R records are treated as active for styling/filter
+            // purposes, yet remain static here because they carry no LARA_FUA
+            // entry of their own.
+            function airspacePaneFor(record) {
+                return getLaraFuaEntry(record) ? 'laraFuaAirspacePane' : 'airspacePane';
+            }
+
+            function airspaceLabelPaneFor(record) {
+                return getLaraFuaEntry(record) ? 'laraFuaAirspaceLabelPane' : 'airspaceLabelPane';
+            }
+
             // A static airspace that also carries a matched LARA_FUA entry
             // is styled by its LARA_FUA activation state instead of its
             // static type -- this is a style substitution, not a second
@@ -5728,6 +5754,8 @@
                 }
 
                 const style = styleForAirspace(record, type);
+                const polygonPane = airspacePaneFor(record);
+                const labelPane = airspaceLabelPaneFor(record);
 
                 if (existing) {
                     // Geometry and/or activation changed: update the
@@ -5737,9 +5765,25 @@
                     existing.layer.setStyle(style);
                     existing.latlngs = latlngs;
 
+                    // A refresh can add/remove a LARA_FUA entry on an existing
+                    // record. Leaflet chooses a Path renderer from its pane when
+                    // the layer is added, so detach and re-add it when the pane
+                    // class changes instead of only mutating layer.options.
+                    if (existing.layer.options.pane !== polygonPane) {
+                        const currentGroup = typeGroups.get(existing.type);
+                        if (currentGroup) currentGroup.removeLayer(existing.layer);
+                        existing.layer.options.pane = polygonPane;
+                        (currentGroup || getOrCreateTypeGroup(existing.type)).addLayer(existing.layer);
+                    }
+
                     if (needsLabel(record, type)) {
                         const center = polygonCentroid(latlngs);
                         if (existing.label) {
+                            if (existing.label.options.pane !== labelPane) {
+                                map.removeLayer(existing.label);
+                                existing.label.options.pane = labelPane;
+                                existing.label.addTo(map);
+                            }
                             existing.label.setLatLng(center);
                             existing.label.setIcon(L.divIcon({
                                 className: 'lara-fua-label-icon',
@@ -5748,7 +5792,7 @@
                             }));
                         } else {
                             existing.label = L.marker(center, {
-                                pane: 'airspaceLabelPane',
+                                pane: labelPane,
                                 interactive: false,
                                 icon: L.divIcon({
                                     className: 'lara-fua-label-icon',
@@ -5787,7 +5831,7 @@
                 // checkbox so no tooltip appears until that's turned on.
                 const layer = L.polygon(latlngs, {
                     ...style,
-                    pane: 'airspacePane'
+                    pane: polygonPane
                 });
 
                 // P/R (permanently active) and LARA_FUA-matched records get
@@ -5796,7 +5840,7 @@
                 if (needsLabel(record, type)) {
                     const center = polygonCentroid(latlngs);
                     label = L.marker(center, {
-                        pane: 'airspaceLabelPane',
+                        pane: labelPane,
                         interactive: false,
                         icon: L.divIcon({
                             className: 'lara-fua-label-icon',
@@ -5884,6 +5928,53 @@
                 const result = [];
                 records.forEach((record) => {
                     const types = Array.isArray(record.types) ? record.types : [];
+
+                    // PilotNet stores some glider areas as two distinct
+                    // logical airspaces in one top-level record: a /S and a
+                    // /V GLDR entry with the same geometry and altitude band.
+                    // They must remain separate because LARA/FUA can activate
+                    // only one variant (for example LHSG123/V). The ordinary
+                    // altitude-band splitter below cannot distinguish them,
+                    // since their numeric bands are identical.
+                    //
+                    // Keep this rule intentionally narrow: exactly two static
+                    // GLDR entries, the same base name and band, with one /S
+                    // and one /V suffix. Broader same-band name splitting would
+                    // incorrectly break apart combined TIZ/RMZ/TMZ records.
+                    const staticEntries = types.filter(t => t && t.type !== LARA_FUA_TYPE);
+                    const laraEntries = types.filter(t => t && t.type === LARA_FUA_TYPE);
+                    const gliderVariants = staticEntries.map((entry) => {
+                        const match = typeof entry.name === 'string' ? entry.name.match(/^(.+)\/(S|V)$/) : null;
+                        return match && entry.type === 'GLDR'
+                            ? { entry, baseName: match[1], suffix: match[2], band: `${entry.heightFrom}|${entry.heightTo}` }
+                            : null;
+                    });
+                    const variantNames = new Set(gliderVariants.filter(Boolean).map(v => v.entry.name));
+                    const isSameBandGliderPair =
+                        staticEntries.length === 2 &&
+                        gliderVariants.every(Boolean) &&
+                        new Set(gliderVariants.map(v => v.baseName)).size === 1 &&
+                        new Set(gliderVariants.map(v => v.band)).size === 1 &&
+                        new Set(gliderVariants.map(v => v.suffix)).size === 2 &&
+                        laraEntries.every(entry =>
+                            variantNames.has(entry.name) &&
+                            `${entry.heightFrom}|${entry.heightTo}` === gliderVariants[0].band
+                        );
+
+                    if (isSameBandGliderPair) {
+                        console.log(`AirspaceManager: splitting same-band GLDR siblings "${gliderVariants[0].baseName}/S" and "${gliderVariants[0].baseName}/V" from record id ${record.id}`);
+                        gliderVariants.forEach((variant, i) => {
+                            const matchingLaraEntries = laraEntries.filter(entry => entry.name === variant.entry.name);
+                            result.push({
+                                ...record,
+                                id: `${record.id}#glider-${i}`,
+                                name: variant.entry.name,
+                                types: [variant.entry, ...matchingLaraEntries]
+                            });
+                        });
+                        return;
+                    }
+
                     const groups = new Map(); // "from|to" -> types[]
                     types.forEach((t) => {
                         if (!t) return;
