@@ -1,21 +1,1310 @@
-:root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #080b0e; color: #d7e2e7; }
-* { box-sizing: border-box; }
-html, body, #app, #cesiumContainer { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-.cesium-viewer-bottom, .cesium-credit-logoContainer { display: none !important; }
-.topbar { position: fixed; inset: 0 0 auto 0; z-index: 10; min-height: 48px; display: flex; align-items: center; gap: 1px; padding: 5px; background: rgba(5,8,10,.93); border-bottom: 1px solid #30414b; }
-button, input { font: inherit; } button { cursor: pointer; }
-.brand, .mode-button, .toggle, .range-control { min-height: 36px; padding: 9px 11px; border: 1px solid #34454f; background: #0d151a; color: #d7e2e7; font-size: 12px; letter-spacing: .04em; }
-.brand { color: #7dffc5; border-color: #438a70; margin-right: 8px; font-weight: 700; } .mode-button.active { color: #07110d; background: #7dffc5; border-color: #7dffc5; }
-.toggle { display: flex; align-items: center; gap: 7px; } .toggle input { accent-color: #7dffc5; }
-.range-control { display: flex; align-items: center; gap: 8px; margin-left: auto; } .range-control input { accent-color: #7dffc5; width: 108px; } output { color: #7dffc5; min-width: 27px; }
-.status { min-width: 130px; display: flex; align-items: center; gap: 7px; padding: 8px; font-size: 11px; color: #8da1ac; } #statusDot { height: 7px; width: 7px; border-radius: 50%; background: #e7b84f; } #statusDot.live { background: #7dffc5; } #statusDot.error { background: #ff6262; }
-.panel { position: fixed; z-index: 11; background: rgba(5,8,10,.92); border: 1px solid #30414b; box-shadow: 0 7px 25px rgba(0,0,0,.35); }
-.left-panel { top: 62px; left: 12px; width: 270px; padding: 12px; } .search-label, .panel-title { display: block; margin-bottom: 8px; font-size: 11px; color: #7dffc5; letter-spacing: .08em; }
-#searchInput { width: 100%; padding: 10px; color: #e5f0f5; border: 1px solid #4b626e; background: #0a1217; outline: none; } #searchInput:focus { border-color: #7dffc5; }
-.search-results { max-height: 180px; overflow-y: auto; } .search-item { width: 100%; padding: 8px 3px; text-align: left; color: #d7e2e7; background: none; border: 0; border-bottom: 1px solid #1d2a31; font-size: 11px; } .search-item:hover { color: #7dffc5; }
-hr { border: 0; border-top: 1px solid #263840; margin: 12px 0; }.metric { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; color: #8da1ac; }.metric strong { color: #e5f0f5; }.hint { margin: 12px 0 0; color: #788b94; font-size: 10px; line-height: 1.5; }
-.tower-panel { right: 12px; bottom: 35px; width: 190px; padding: 12px; }.ptz-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }.ptz-grid button { height: 34px; border: 1px solid #3a505c; background: #101a20; color: #d7e2e7; }.ptz-grid button:hover { color: #07110d; background: #7dffc5; }
-.details-panel { right: 12px; top: 62px; width: 260px; padding: 13px; }.close { position: absolute; right: 7px; top: 4px; background: transparent; border: 0; color: #9caeb7; font-size: 20px; }dl { margin: 0; display: grid; grid-template-columns: 88px 1fr; gap: 7px; font-size: 11px; }dt { color: #8397a1; }dd { margin: 0; color: #e3eef2; }
-.datablock { position: fixed; z-index: 9; min-width: 135px; padding: 5px 7px; color: #dfffe9; background: rgba(3,12,8,.9); border: 1px solid #4cd889; box-shadow: 0 2px 8px rgba(0,0,0,.45); font-size: 11px; line-height: 1.35; cursor: grab; user-select: none; touch-action: none; }.datablock.selected { border-color: #fff56e; color: #fffbd0; }.datablock .sub { color: #8ec9a6; font-size: 10px; }.datablock.dragging { cursor: grabbing; }
-.footer { position: fixed; z-index: 10; bottom: 0; left: 0; right: 0; padding: 7px 12px; color: #7e9099; background: rgba(5,8,10,.82); border-top: 1px solid #253740; font-size: 9px; letter-spacing: .04em; }
-@media (max-width: 850px) { .brand { display:none; }.topbar { flex-wrap: wrap; }.range-control { margin-left: 0; }.left-panel { top: 100px; }.details-panel { top: 100px; } }
+		html, body { width: 100%; height: 100%; }
+        body { margin: 0; background-color: #000; overflow: hidden; }
+        #radar-scope { width: 100%; height: 100vh; height: 100dvh; background: #000; }
+
+        #radar-scope .leaflet-control-attribution {
+            padding: 2px 5px;
+            background: rgba(0, 0, 0, 0.82);
+            color: #aeb6b1;
+        }
+        #radar-scope .leaflet-control-attribution a {
+            color: #d7ddd9;
+        }
+
+        /* Datablock leader-line canvas. Each leader is geometrically split
+           around only its own datablock row rectangles, then all visible
+           segments are stroked in one pass. This preserves pair-specific row
+           masking without animating a viewport-sized SVG,
+           which caused Chromium to rasterize multiple GPU tiles every frame.
+           The canvas is pointer-events:none; datablocks keep handling input via
+           .atc-label-clickable's pointer-events:auto. */
+        #datablock-leader-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 705;
+        }
+
+        /* Datablock drag affordance + emergency row, mirroring the
+           datablock.html prototype. */
+        .atc-label-clickable {
+            cursor: grab;
+        }
+        .atc-label-clickable.datablock-dragging {
+            cursor: grabbing;
+        }
+        .atc-label-emergency {
+            color: #ff2020;
+            animation: datablockEmergencyBlink 2s steps(1, end) infinite;
+        }
+        @keyframes datablockEmergencyBlink {
+            0%, 49% { color: #ff2020; }
+            50%, 100% { color: #a00000; }
+        }
+        
+        /* Dynamic Zulu Clock Header Indicator */
+        .radar-clock-panel {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 8, 8, 0.4);
+            padding: 1px 4px;
+            z-index: 1000;
+            font-family: 'Google Sans Code', monospace;
+            color: #8A8A8A;
+            font-size: 16px;
+            font-weight: normal;
+            letter-spacing: 0px;
+            pointer-events: none;
+        }
+
+        /* METAR Report Panel */
+        .radar-metar-panel {
+            position: absolute;
+            top: 39px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(8, 8, 8, 0.4);
+            padding: 1px 4px;
+            z-index: 1000;
+            font-family: 'Google Sans Code', monospace;
+            color: #8A8A8A;
+            font-size: 12px;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            white-space: nowrap;
+            max-width: 90vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Modern radar settings UI */
+        .radar-ui-wrapper {
+            position: absolute;
+            top: 50%;
+            right: 16px;
+            transform: translateY(-50%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Google Sans Code', monospace;
+            transition: none;
+        }
+        .radar-ui-launcher {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 5px;
+            background: rgba(8, 10, 9, 0.78);
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 11px;
+            box-shadow: 0 12px 35px rgba(0,0,0,.35);
+            backdrop-filter: blur(14px);
+        }
+        .radar-launch-btn {
+            width: 40px;
+            height: 36px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: transparent;
+            color: #737b76;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+        .radar-launch-btn:hover {
+            color: #e3e8e5;
+            background: rgba(255,255,255,.055);
+            border-color: rgba(255,255,255,.08);
+        }
+        .radar-launch-btn.active {
+            color: #071007;
+            background: #5DEB3D;
+            border-color: #5DEB3D;
+        }
+        .radar-launch-btn span {
+            display:block;
+            margin-top: 2px;
+            color: #737b76;
+            font-size: 8px;
+        }
+
+        .radar-ui-panel {
+            position: absolute;
+            right: 55px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 270px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            padding: 16px;
+            box-sizing: border-box;
+            background: rgba(13,16,15,.94);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 14px;
+            box-shadow: 0 18px 55px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.025);
+            backdrop-filter: blur(18px) saturate(115%);
+            color: #e2e6e3;
+            display: none;
+            animation: radarPanelIn .14s ease-out;
+        }
+        .radar-ui-panel.is-open { display:block; }
+        .radar-ui-panel::-webkit-scrollbar { width: 5px; }
+        .radar-ui-panel::-webkit-scrollbar-thumb { background:#343b37; border-radius:10px; }
+        @keyframes radarPanelIn {
+            from { opacity:0; transform:translateY(-50%) translateX(6px); }
+            to { opacity:1; transform:translateY(-50%) translateX(0); }
+        }
+        .radar-panel-heading {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            height: 38px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,.09);
+            color:#dce2de;
+            font-size:10px;
+            font-weight:700;
+            letter-spacing:1px;
+            text-transform:uppercase;
+        }
+        .radar-panel-close {
+            width:26px;height:26px;
+            border:1px solid rgba(255,255,255,.10);
+            border-radius:7px;
+            background:rgba(255,255,255,.035);
+            color:#7c8580;
+            font-family:'Google Sans Code',monospace;
+            cursor:pointer;
+        }
+        .radar-panel-close:hover { color:#fff; background:rgba(255,255,255,.08); }
+
+        .radar-view-btn-row { display:flex; gap:5px; margin-bottom:10px; }
+        .radar-reset-btn {
+            flex:1;
+            width:auto;
+            min-height:34px;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.10);
+            color:#8b948e;
+            padding:6px;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            font-weight:600;
+            letter-spacing:.4px;
+            box-sizing:border-box;
+            border-radius:7px;
+            cursor:pointer;
+            margin-bottom:0;
+        }
+        .radar-reset-btn:hover { color:#fff; background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.18); }
+        .radar-reset-btn:active { color:#5DEB3D; border-color:#5DEB3D; }
+
+        .radar-search-container { margin-bottom: 10px; }
+        .radar-search-input {
+            width:100%; height:34px;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.10);
+            color:#e7ebe8;
+            padding:0 10px;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            box-sizing:border-box;
+            border-radius:8px;
+        }
+        .radar-search-input::placeholder { color:#555e59; }
+        .radar-search-input:focus {
+            outline:none;
+            border-color:rgba(103,232,90,.42);
+            box-shadow:0 0 0 3px rgba(103,232,90,.06);
+        }
+
+        /* Bottom toolbox: persistent search plus map measuring controls. */
+        .radar-toolbox {
+            position: fixed;
+            left: 50%;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            z-index: 1100;
+            display: flex;
+            align-items: stretch;
+            gap: 5px;
+            padding: 5px;
+            box-sizing: border-box;
+            background: rgba(8, 10, 9, 0.88);
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: 0 8px 24px rgba(0,0,0,.35);
+            backdrop-filter: blur(14px);
+            font-family: 'Google Sans Code', monospace;
+        }
+        .radar-toolbox-search {
+            width: clamp(150px, 24vw, 260px);
+            height: 36px;
+            margin: 0;
+        }
+        .radar-toolbox-btn {
+            height: 36px;
+            padding: 0 10px;
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.035);
+            color: #aeb6b1;
+            font: 700 10px 'Google Sans Code', monospace;
+            letter-spacing: .5px;
+            cursor: pointer;
+        }
+        .radar-toolbox-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,.07);
+            border-color: rgba(255,255,255,.18);
+        }
+        .radar-toolbox-btn.active {
+            color: #0b0d0c;
+            background: #ffe600;
+            border-color: #ffe600;
+        }
+        .radar-toolbox-clear {
+            display: none;
+            width: 36px;
+            padding: 0;
+            color: #ffe600;
+            font-size: 22px;
+            font-weight: 400;
+            line-height: 1;
+        }
+        .radar-toolbox.has-measurement .radar-toolbox-clear { display: block; }
+        .radar-measure-status {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 6px);
+            transform: translateX(-50%);
+            display: none;
+            width: max-content;
+            max-width: min(420px, calc(100vw - 24px));
+            padding: 6px 9px;
+            box-sizing: border-box;
+            background: rgba(8, 10, 9, .92);
+            border: 1px solid rgba(255, 230, 0, .35);
+            color: #ffe600;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.35;
+            text-align: center;
+            pointer-events: none;
+        }
+        .radar-toolbox.measuring .radar-measure-status,
+        .radar-toolbox.has-measurement .radar-measure-status { display: block; }
+        #radar-scope.measure-mode { cursor: crosshair; }
+        .radar-measure-path { pointer-events: none; }
+        .radar-measure-point-icon {
+            width: 9px;
+            height: 9px;
+            margin: -5px 0 0 -5px;
+            border: 1px solid #151515;
+            border-radius: 50%;
+            background: #ffe600;
+            box-shadow: 0 0 0 1px rgba(255,230,0,.45);
+        }
+        .radar-measure-label-icon {
+            width: auto !important;
+            height: auto !important;
+            margin: 0 !important;
+            pointer-events: none;
+        }
+        .radar-measure-label {
+            display: inline-block;
+            transform: translate(-50%, -50%);
+            width: max-content;
+            padding: 5px 7px;
+            background: rgba(8, 10, 9, .96);
+            border: 1px solid rgba(255,230,0,.55);
+            color: #ffe600;
+            font: 400 13px 'Google Sans Code', monospace;
+            line-height: 1.25;
+            white-space: nowrap;
+            text-shadow: 0 1px 2px #000;
+            box-shadow: 0 2px 9px rgba(0,0,0,.7);
+        }
+        .radar-measure-label.preview { border-style: dashed; }
+        .radar-ui-title {
+            font-size:10px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:1px;
+            color:#dce2de;
+            margin:0 0 10px;
+            padding-bottom:10px;
+            border-bottom:1px solid rgba(255,255,255,.09);
+        }
+        .radar-ui-section {
+            font-size:8px;
+            color:#59625d;
+            text-transform:uppercase;
+            letter-spacing:.7px;
+            margin:13px 8px 4px;
+        }
+        .radar-ui-control {
+            display:flex;
+            align-items:center;
+            min-height:34px;
+            margin:0;
+            padding:2px 8px;
+            border-radius:7px;
+            color:#aaa;
+            font-family:'Google Sans Code',monospace;
+            font-size:10px;
+            cursor:pointer;
+            transition:.12s ease;
+        }
+        .radar-ui-control:hover { color:#fff; background:rgba(255,255,255,.035); }
+        .radar-ui-control input[type="checkbox"] {
+            width:13px;
+            height:13px;
+            margin:0 9px 0 0;
+            cursor:pointer;
+        }
+        .radar-slider-output {
+            font-size:11px;
+            font-weight:700;
+            color:#5DEB3D;
+            margin-bottom:4px;
+        }
+        .radar-ui-slider { width:100%; margin:0; accent-color:#5DEB3D; cursor:pointer; }
+
+        .radar-atc-links { display:flex; flex-direction:column; gap:5px; }
+        .radar-atc-link {
+            min-height:34px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:0 9px;
+            box-sizing:border-box;
+            border:1px solid rgba(255,255,255,.075);
+            border-radius:0;
+            background:rgba(255,255,255,.025);
+            color:#999;
+            font-family:'Google Sans Code',monospace;
+            font-size:11px;
+            text-decoration:none;
+        }
+        .radar-atc-link:hover { border-color:rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#e4e9e5; }
+        .radar-atc-link-all { color:#5DEB3D; border-color:rgba(103,232,90,.24); background:rgba(103,232,90,.08); }
+
+        /* ATC Target Label (Datablock) */
+        .atc-label {
+            color: #5DEB3D;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 12px;
+            font-weight: normal;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .atc-label-clickable {
+            pointer-events: auto !important;
+            cursor: pointer;
+        }
+        .atc-label-clickable.datablock-hidden {
+            pointer-events: none !important;
+            cursor: default;
+        }
+
+        /* Aircraft Info Panel (opens on datablock click) */
+        .aircraft-info-panel {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            z-index: 1100;
+            width: min(340px, calc(100vw - 24px));
+            max-height: calc(100vh - 24px);
+            overflow-x: hidden;
+            overflow-y: auto;
+            background: rgba(13, 16, 15, .94);
+            border: 1px solid rgba(255,255,255,.12);
+            border-top: none;
+            border-left: none;
+            border-radius: 0;
+            padding: 16px;
+            box-sizing: border-box;
+            font-family: 'Google Sans Code', monospace;
+            color: #8b948e;
+            box-shadow: 0 18px 55px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.025);
+            backdrop-filter: blur(18px) saturate(115%);
+            display: none;
+        }
+        .aircraft-info-panel.open { display: block; }
+        .aircraft-info-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            border-bottom: 1px solid rgba(255, 255, 255, .09);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .aircraft-info-panel-callsign {
+            color: #5DEB3D;
+            font-size: 15px;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+        }
+        .aircraft-info-panel-close {
+            width: 26px;
+            height: 26px;
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 7px;
+            background: rgba(255,255,255,.035);
+            color: #7c8580;
+            cursor: pointer;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 24px;
+            text-align: center;
+        }
+        .aircraft-info-panel-close:hover { color: #fff; background: rgba(255,255,255,.08); }
+        .aircraft-info-panel-photo-wrap {
+            width: 100%;
+            aspect-ratio: auto;
+            background: rgba(255,255,255,.025);
+            border: 1px solid rgba(255, 255, 255, .10);
+            border-radius: 7px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .aircraft-info-panel-photo-wrap img {
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            display: block;
+            object-fit: contain;
+            display: block;
+        }
+        .aircraft-info-panel-photo-placeholder {
+            color: #59625d;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .aircraft-info-panel-credit {
+            font-size: 9px;
+            color: #59625d;
+            text-align: right;
+            margin: -6px 0 10px 0;
+            letter-spacing: 0.3px;
+        }
+        .aircraft-info-panel-credit a { color: #59625d; text-decoration: none; }
+        .aircraft-info-panel-credit a:hover { color: #8b948e; }
+        .aircraft-info-panel-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .aircraft-info-panel-row:last-child { border-bottom: none; }
+        .aircraft-info-panel-row-label {
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #59625d;
+        }
+        .aircraft-info-panel-row-value {
+            color: #e2e6e3;
+            font-weight: normal;
+            text-align: right;
+        }
+        .aircraft-info-panel-row-value.squawk-emergency { color: #FF3B30; }
+        /* Aircraft info panel: never introduce horizontal scrolling; let long values wrap. */
+        .aircraft-info-panel-row { min-width: 0; gap: 12px; }
+        .aircraft-info-panel-row-label,
+        .aircraft-info-panel-row-value { min-width: 0; overflow-wrap: anywhere; }
+        .aircraft-info-panel-row-value { max-width: 62%; }
+
+
+        /* Clean containers for custom markers */
+        .wp-triangle-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        /* Strip out all tooltip pointer arrows/triangles completely */
+        .leaflet-tooltip {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .leaflet-tooltip:before {
+            display: none !important;
+        }
+        
+        /* ATC Target Square */
+        .atc-target-icon {
+            background: transparent;
+            border: none;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+        .atc-target-icon::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 11px;
+            height: 11px;
+            border: 2.2px solid #5DEB3D;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box;
+        }
+        .atc-target-icon.selected::before {
+            box-shadow: 0 0 0 3px rgba(93, 235, 61, 0.35), 0 0 6px 2px rgba(93, 235, 61, 0.6);
+        }
+        /* aircraftPane's Canvas renderer (speedLine polylines, history
+           dots) paints into one full-viewport <canvas> even where nothing
+           is drawn, and that canvas -- being the topmost DOM element at
+           every point on the map, since aircraftPane sits above
+           airspacePane, waypoint panes, etc. -- silently swallowed mouse
+           events for every layer beneath it, map-wide, not just where an
+           aircraft is actually drawn. pointer-events:none here lets those
+           events fall through; aircraft click/hover still work through
+           the real DOM ui.marker element inside this same
+           pane, which set their own pointer-events:auto. (The datablock
+           leader line is a separate SVG overlay, not in this pane -- see
+           #datablock-leader-canvas.) */
+        #radar-scope .leaflet-aircraft-pane > canvas {
+            pointer-events: none;
+        }
+        /* Same issue, different pane: SID/STAR procedures, runway
+           extension/tick lines, and holding patterns render onto
+           Leaflet's default overlayPane (no explicit pane option), which
+           sits directly above the airspace panes (394-397 vs 400) and gets a
+           full-viewport canvas. Its content is now interactive:false at
+           the layer level (see sid31Style etc. in procedures.js), but this CSS rule is
+           kept as a second guard so nothing else added to this pane
+           later can silently reintroduce the same block. Nothing in
+           overlayPane needs real pointer events -- waypoint labels are
+           DOM L.marker tooltips (permanent, non-hover) and are
+           unaffected since Leaflet markers never render to canvas. */
+        #radar-scope .leaflet-overlay-pane > canvas {
+            pointer-events: none;
+        }
+        /* MLAT-sourced aircraft are shown as a rectangle instead of a
+           circle, so the position source is distinguishable at a glance. */
+        .atc-target-icon.mlat::before {
+            width: 11px;
+            height: 11px;
+            border-radius: 1px;
+        }
+            /* Separate sidebar groups: view presets, runway toggle, settings */
+        .radar-ui-launcher {
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            backdrop-filter: none;
+            gap: 7px;
+        }
+        .radar-launch-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 5px;
+            background: rgba(8, 10, 9, 0.78);
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 11px;
+            box-shadow: 0 12px 35px rgba(0,0,0,.35);
+            backdrop-filter: blur(14px);
+        }
+        .radar-launch-side { display: contents; }
+
+        /* Dual-thumb altitude filters — preserved from the original radar UI */
+        .radar-dual-slider {
+            position:relative;
+            height:18px;
+            margin:2px 0 4px;
+        }
+        .radar-dual-slider-track {
+            position:absolute;
+            left:0;right:0;top:50%;
+            height:3px;
+            transform:translateY(-50%);
+            background:#333;
+            border-radius:2px;
+        }
+        .radar-dual-slider-fill {
+            position:absolute;
+            top:50%;
+            height:3px;
+            transform:translateY(-50%);
+            background:#5DEB3D;
+            border-radius:2px;
+        }
+        .radar-dual-slider input[type="range"] {
+            position:absolute;
+            left:0;right:0;top:0;
+            width:100%;
+            height:18px;
+            margin:0;
+            background:transparent;
+            pointer-events:none;
+            -webkit-appearance:none;
+            appearance:none;
+        }
+        .radar-dual-slider input[type="range"]::-webkit-slider-runnable-track {
+            background:transparent;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-track {
+            background:transparent;
+        }
+        .radar-dual-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            appearance:none;
+            pointer-events:auto;
+            width:12px;height:12px;
+            border-radius:50%;
+            background:#fff;
+            border:1px solid #5DEB3D;
+            cursor:pointer;
+            margin-top:-4.5px;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-thumb {
+            pointer-events:auto;
+            width:12px;height:12px;
+            border-radius:50%;
+            background:#fff;
+            border:1px solid #5DEB3D;
+            cursor:pointer;
+            box-sizing:border-box;
+        }
+
+
+        /* Sidebar typography refinement */
+        .radar-launch-btn {
+            font-size: 11px !important;
+        }
+        .radar-launch-btn span {
+            font-size: 14px !important;
+        }
+        .radar-panel-heading {
+            font-size: 12px !important;
+        }
+        .radar-ui-panel,
+        .radar-ui-panel label,
+        .radar-ui-panel button,
+        .radar-ui-panel input,
+        .radar-ui-section,
+        .radar-slider-output {
+            font-size: 11px;
+        }
+
+        /* View presets and runway are selectors, not status indicators:
+           keep them neutral rather than using the green accent. */
+        .radar-launch-btn[data-view-preset].active {
+            color: #d0d5d2 !important;
+            background: rgba(255,255,255,.055) !important;
+            border-color: rgba(255,255,255,.14) !important;
+        }
+
+
+        /* Explicit ON/OFF controls replace ordinary checkboxes */
+        .radar-onoff-control {
+            width:100%;
+            min-height:34px;
+            margin:2px 0;
+            padding:0 8px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:7px;
+            background:rgba(255,255,255,.025);
+            color:#aeb6b1;
+            font:500 11px 'Google Sans Code', monospace;
+            text-align:left;
+            cursor:pointer;
+            transition:.14s ease;
+        }
+        .radar-onoff-control:hover {
+            color:#e4e9e5;
+            background:rgba(255,255,255,.05);
+            border-color:rgba(255,255,255,.15);
+        }
+        .radar-onoff-control .onoff-state {
+            min-width:31px;
+            padding:3px 5px;
+            border-radius:4px;
+            text-align:center;
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:.4px;
+        }
+        .radar-onoff-control .onoff-state.ON {
+            color:#67e85a;
+            background:rgba(103,232,90,.10);
+            border:1px solid rgba(103,232,90,.22);
+        }
+        .radar-onoff-control .onoff-state.OFF {
+            color:#68716c;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.08);
+        }
+        .radar-hidden-checkbox {
+            position:absolute !important;
+            opacity:0 !important;
+            pointer-events:none !important;
+            width:1px !important;
+            height:1px !important;
+        }
+
+
+        /* View presets and runway direction are neutral controls, not
+           status indicators: they never use the green active-state
+           treatment that other launch buttons get. */
+        .radar-launch-btn[data-view-preset],
+        .radar-launch-btn[data-view-preset].active,
+        #rwy-direction-btn,
+        #rwy-direction-btn.active,
+        #rwy-direction-btn.rwy-pristine,
+        #rwy-direction-btn.modified {
+            color:#b8c0bb !important;
+            background:rgba(255,255,255,.035) !important;
+            border-color:rgba(255,255,255,.10) !important;
+            box-shadow:none !important;
+        }
+        .radar-launch-btn[data-view-preset]:hover,
+        #rwy-direction-btn:hover {
+            color:#e2e7e4 !important;
+            background:rgba(255,255,255,.07) !important;
+            border-color:rgba(255,255,255,.18) !important;
+        }
+        #rwy-direction-btn span {
+            color:#8c9690 !important;
+        }
+
+
+        /* Airspace status matrix: TYPE | Static | Scheduled | Active */
+        .airspace-type-header,
+        .airspace-type-row {
+            display:grid;
+            grid-template-columns:minmax(0,1fr) 22px 22px 22px;
+            align-items:center;
+            column-gap:4px;
+        }
+        .airspace-type-header {
+            margin:10px 0 4px;
+            padding:0 5px;
+            color:#59615c;
+            font-size:8px;
+            letter-spacing:.5px;
+        }
+        .airspace-type-header-check { text-align:center; font-weight:700; }
+        .airspace-type-row {
+            min-height:28px;
+            padding:2px 5px;
+            border-radius:6px;
+        }
+        .airspace-type-row:hover { background:rgba(255,255,255,.035); }
+        .airspace-type-name { color:#aeb6b1; font-size:10px; min-width:0; }
+        .airspace-matrix-check {
+            appearance:none;
+            -webkit-appearance:none;
+            width:15px !important;
+            height:15px;
+            margin:0 !important;
+            justify-self:center;
+            border:1px solid #4b514e;
+            border-radius:4px;
+            background:#151817;
+            cursor:pointer;
+            position:relative;
+        }
+        .airspace-matrix-check:checked::after {
+            content:'✓';
+            position:absolute;
+            inset:0;
+            display:grid;
+            place-items:center;
+            font-size:10px;
+            font-weight:700;
+        }
+        .airspace-matrix-check.static-cell:checked { border-color:#aaa; background:rgba(170,170,170,.12); color:#aaa; }
+        .airspace-matrix-check.scheduled-cell:checked { border-color:#ffc107; background:rgba(255,193,7,.12); color:#ffc107; }
+        .airspace-matrix-check.activated-cell:checked { border-color:#ff3b30; background:rgba(255,59,48,.12); color:#ff3b30; }
+        .radar-panel-note {
+            margin-top: 10px;
+            padding: 9px 10px;
+            border-radius: 7px;
+            background: rgba(255,255,255,.025);
+            color: #59615c;
+            font-size: 9px;
+            line-height: 1.45;
+        }
+
+        /* Visual refinement: flatter, more utilitarian radar-console styling */
+        .radar-launch-group {
+            border-radius: 0 !important;
+            box-shadow: 0 8px 24px rgba(0,0,0,.28) !important;
+        }
+        .radar-launch-btn {
+            border-radius: 0 !important;
+        }
+        .radar-ui-panel {
+            border-radius: 0 !important;
+            box-shadow: -8px 10px 30px rgba(0,0,0,.40) !important;
+        }
+        .radar-panel-close {
+            border-radius: 0 !important;
+        }
+        .radar-onoff-control {
+            border-radius: 0 !important;
+        }
+        .radar-onoff-control .onoff-state {
+            border-radius: 0 !important;
+        }
+        .radar-search-input,
+        .radar-search-container input {
+            border-radius: 0 !important;
+        }
+        .radar-slider-row,
+        .radar-ui-section-card,
+        .radar-radio-row,
+        .radar-atc-link,
+        .radar-panel-note {
+            border-radius: 0 !important;
+        }
+        .radar-airspace-matrix,
+        .radar-airspace-matrix .matrix-cell,
+        .radar-airspace-matrix .matrix-head {
+            border-radius: 0 !important;
+        }
+
+
+        /* Map label styling — kept identical to the working radar version */
+        .taxiway-label {
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 12px;
+            font-family: 'Google Sans Code', monospace;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.9);
+            pointer-events: none;
+        }
+        .stand-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
+        .stand-marker .stand-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255, 200, 60, 0.85);
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+        }
+        .stand-marker .stand-label {
+            margin-top: 1px;
+            font-size: 10px;
+            font-family: 'Google Sans Code', monospace;
+            font-weight: normal;
+            color: rgba(255, 200, 60, 0.9);
+            white-space: nowrap;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.95);
+        }
+        .leaflet-tooltip.airspace-info-tooltip {
+            background: rgba(10, 14, 18, 0.94) !important;
+            color: #E0F7FF;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            padding: 6px 8px;
+            max-width: 260px;
+        }
+        .leaflet-tooltip.airspace-info-tooltip::before {
+            display: none;
+        }
+        .airspace-info-entry + .airspace-info-entry {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .airspace-info-entry-name {
+            font-weight: 700;
+            color: #E0F7FF;
+        }
+        .airspace-info-entry-row {
+            color: #aeb6b1;
+        }
+        .airspace-info-entry-row b {
+            color: #E0F7FF;
+            font-weight: normal;
+        }
+        .lara-fua-label-icon {
+            background: transparent !important;
+            border: none !important;
+            width: max-content !important;
+            height: max-content !important;
+        }
+        .lara-fua-label {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: max-content;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 11px;
+            font-weight: normal;
+            line-height: 1;
+            white-space: nowrap;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            text-shadow:
+                -1px -1px 0 rgba(0,0,0,0.95),
+                 1px -1px 0 rgba(0,0,0,0.95),
+                -1px  1px 0 rgba(0,0,0,0.95),
+                 1px  1px 0 rgba(0,0,0,0.95),
+                 0 0 3px rgba(0,0,0,0.95);
+        }
+        .lara-fua-label.published { color: #FFC107; }
+        .lara-fua-label.active { color: #FF3B30; }
+        .permanent-airspace-label { pointer-events: none; }
+        .lara-fua-label-name {
+            width: 100%;
+            text-align: center;
+            line-height: 1.05;
+            margin-bottom: 3px;
+        }
+        .lara-fua-label-details {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: max-content;
+            gap: 7px;
+            line-height: 1;
+        }
+        .lara-fua-label-time {
+            min-width: 38px;
+            text-align: center;
+        }
+        .lara-fua-label-alt {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            font-size: 11px;
+            line-height: 0.9;
+        }
+        .lara-fua-label-alt-top {
+            padding-bottom: 1px;
+            border-bottom: 1px solid currentColor;
+        }
+        .lara-fua-label-alt-bottom {
+            padding-top: 1px;
+        }
+
+
+        /* Waypoint Alphanumeric Text Styling */
+        .fix-label {
+            color: #8A8A8A;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 11px;
+            font-weight: normal;
+            text-shadow: none;
+            background: none;
+            border: none;
+			text-shadow:
+                -1px -1px 0 rgba(0,0,0,0.95),
+                 1px -1px 0 rgba(0,0,0,0.95),
+                -1px  1px 0 rgba(0,0,0,0.95),
+                 1px  1px 0 rgba(0,0,0,0.95),
+                 0 0 3px rgba(0,0,0,0.95);
+        }
+
+
+
+        /* Panel source/status information lives at the bottom */
+        .radar-source-panel-status {
+            margin: 12px 0 0;
+            padding: 8px 0 0;
+            border-top: 1px solid rgba(255,255,255,.07);
+            border-bottom: 0;
+            color: #68716c;
+            font-family: 'Google Sans Code', monospace;
+            font-size: 9px;
+            line-height: 1.45;
+            letter-spacing: .15px;
+        }
+
+
+        /* Radar opacity is a persistent Weather-panel control */
+        #rain-opacity-container,
+        #radar-rain-opacity-container,
+        .rain-opacity-container {
+            display: block !important;
+            visibility: visible !important;
+        }
+
+
+        /* Airspace matrix status headers */
+        .airspace-type-header-check.static-h {
+            color: #aaa !important;
+        }
+        .airspace-type-header-check.scheduled-h {
+            color: #ffc107 !important;
+        }
+        .airspace-type-header-check.activated-h {
+            color: #ff3b30 !important;
+        }
+
+        /* Slightly larger airspace type labels */
+        .airspace-type-row .airspace-type-name,
+        .airspace-type-name {
+            font-size: 11px !important;
+        }
+
+
+        /* Sliders use the same flat option background as the other controls,
+           with padding matched to the regular option controls. */
+        .radar-slider-container {
+            margin: 2px 0 !important;
+            padding: 6px 8px !important;
+            min-height: 34px;
+            box-sizing: border-box;
+            border-radius: 0 !important;
+            border: 1px solid rgba(255,255,255,.08) !important;
+            background: rgba(255,255,255,.025) !important;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Slider titles match regular option text. */
+        .radar-slider-container .radar-ui-section {
+            margin: 0 0 2px 0 !important;
+            color: #aeb6b1 !important;
+            font-family: 'Google Sans Code', monospace !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
+        }
+
+        .radar-slider-container .radar-slider-output {
+            margin-bottom: 2px !important;
+        }
+
+
+        /* Align the airspace dual-slider thumbs with the filter track. */
+        .radar-dual-slider input[type="range"]::-webkit-slider-thumb {
+            margin-top: 0 !important;
+        }
+        .radar-dual-slider input[type="range"]::-moz-range-thumb {
+            transform: translateY(0) !important;
+        }
+
+
+        /* Airspace status toggles: full labels replace the separate legend. */
+        .airspace-static-toggle { color:#aaa !important; }
+        .airspace-scheduled-toggle { color:#ffc107 !important; }
+        .airspace-active-toggle { color:#ff3b30 !important; }
+        .airspace-static-toggle,
+        .airspace-scheduled-toggle,
+        .airspace-active-toggle {
+            font-size:10px !important;
+            font-weight:600 !important;
+            letter-spacing:.3px !important;
+        }
+
+
+        .airspace-status-title {
+            margin-left: 8px;
+            color: #737b76;
+            font-size: 8px;
+            font-weight: 500;
+            letter-spacing: .5px;
+        }
+
+
+        .airspace-status-subtitle {
+            color: #737b76 !important;
+            font-size: 8px !important;
+            font-weight: 500 !important;
+            letter-spacing: .5px !important;
+            margin-top: 6px !important;
+        }
+
+
+        /* Match STATUS VISIBILITY to the other panel subtitles. */
+        .airspace-status-subtitle {
+            font-size: 11px !important;
+        }
+
+
+        /* Settings panel close controls: simple, larger X with no button chrome. */
+        .radar-ui-panel .radar-panel-close,
+        .aircraft-info-panel-close {
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            padding: 0 2px !important;
+            margin: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #aeb6b1 !important;
+            font-size: 22px !important;
+            font-weight: 400 !important;
+            line-height: 1 !important;
+        }
+
+        .radar-ui-panel .radar-panel-close:hover,
+        .radar-ui-panel .radar-panel-close:focus,
+        .radar-ui-panel .radar-panel-close:active,
+        .aircraft-info-panel-close:hover,
+        .aircraft-info-panel-close:focus,
+        .aircraft-info-panel-close:active {
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #e4e9e5 !important;
+            outline: none !important;
+        }
+
+        .mobile-zoom-control { display: none; }
+
+        /* Phone layout: retain the original vertical launcher while presenting
+           settings as a space-efficient bottom sheet. */
+        @media (max-width: 600px),
+               (orientation: portrait) and (max-width: 900px),
+               (orientation: landscape) and (max-height: 600px) {
+            .radar-ui-wrapper {
+                top: 0;
+                right: max(16px, env(safe-area-inset-right));
+                bottom: 0;
+                left: auto;
+                transform: none;
+                display: flex;
+                align-items: center;
+                z-index: 1000;
+            }
+
+            .radar-ui-launcher {
+                width: auto;
+                flex-direction: column;
+                align-items: center;
+                overflow: visible;
+            }
+
+            .radar-launch-group {
+                display: flex;
+                flex-direction: column;
+                flex: none;
+            }
+
+            .radar-launch-btn {
+                width: 40px;
+                height: 36px;
+                flex: none;
+            }
+
+            .radar-toolbox {
+                bottom: max(8px, env(safe-area-inset-bottom));
+                max-width: calc(100vw - 16px);
+            }
+            .radar-toolbox-search { width: min(44vw, 190px); }
+            .radar-toolbox-btn { padding: 0 8px; }
+
+            .mobile-zoom-control {
+                display: block;
+                z-index: 700;
+                margin-left: max(8px, env(safe-area-inset-left)) !important;
+                margin-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+            }
+
+            .mobile-zoom-control a {
+                width: 44px !important;
+                height: 44px !important;
+                line-height: 44px !important;
+                font-size: 24px !important;
+                background: rgba(8, 10, 9, 0.88) !important;
+                color: #dce2de !important;
+                border-color: rgba(255,255,255,.10) !important;
+            }
+
+            /* Leaflet controls live in their own stacking context. Remove the
+               mobile zoom control while an overlay is open so it can never
+               paint or receive taps above a settings/detail popup. */
+            body:has(.radar-ui-panel.is-open) .mobile-zoom-control,
+            body:has(.aircraft-info-panel.open) .mobile-zoom-control {
+                visibility: hidden !important;
+                pointer-events: none !important;
+            }
+
+        }
+
+        /* Compact landscape: split the launcher into two edge rails so the
+           controls do not form one viewport-height stack. */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .radar-ui-wrapper {
+                position: fixed;
+                inset: 0;
+                transform: none;
+                display: block;
+                pointer-events: none;
+            }
+
+            .radar-ui-launcher {
+                width: 100%;
+                height: 100%;
+                box-sizing: border-box;
+                padding: max(8px, env(safe-area-inset-top))
+                    max(16px, env(safe-area-inset-right))
+                    max(8px, env(safe-area-inset-bottom))
+                    max(16px, env(safe-area-inset-left));
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                pointer-events: none;
+            }
+
+            .radar-launch-side {
+                display: flex;
+                flex-direction: column;
+                gap: 7px;
+                pointer-events: auto;
+            }
+
+            .radar-launch-group { flex: none; }
+            .radar-ui-panel { pointer-events: auto; }
+        }
+

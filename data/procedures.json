@@ -1,0 +1,71 @@
+{
+  "sid31": [
+    [{"runway":"13R"},"BP801"],
+    [{"runway":"13L"},"BP801"],
+    [{"at":"BP801","overfly":{"inbound":320,"nextInbound":205}},"BP821","BP822"],
+    ["BP801","BP802","BP803"],
+    [{"at":"BP801","overfly":{"inbound":320,"nextInbound":35}},"BP811","BP812"],
+    ["BP803","BP812","VETIK"],
+    ["BP803","WITRI"],
+    ["BP812","WITRI"],
+    ["BP812","BP813","LITKU"],
+    ["BP803","BP813"],
+    ["BP803","BADOV"],
+    [{"at":"BP821","overfly":{"inbound":205,"nextInbound":298}},"PUCOG","GILEP"],
+    ["BP822","DUZLA"],
+    ["BP822","FAHAZ"],
+    ["BP822","GAZDA"]
+  ],
+  "sid13": [
+    [{"runway":"31R"},"BP701"],
+    [{"at":"BP701","overfly":{"inbound":120,"nextInbound":39}},"BP702"],
+    [{"at":"BP701","overfly":{"inbound":120,"nextInbound":242}},"BP712"],
+    [{"runway":"31L"},"BP711"],
+    [{"at":"BP711","overfly":{"inbound":132,"nextInbound":39}},"BP702"],
+    [{"at":"BP711","overfly":{"inbound":132,"nextInbound":242}},"BP712"],
+    ["BP712","DUZLA"],
+    ["BP712","FAHAZ"],
+    ["BP712","GAZDA"],
+    ["BP712","PUCOG","GILEP"],
+    ["BP702","BP703"],
+    ["BP703","BP704","BADOV"],
+    ["BP703","BP705","LITKU"],
+    ["BP705","WITRI"],
+    ["BP702","VETIK"]
+  ],
+  "star31": [
+    ["ANEXA","BP840","BP841","BP842","BP843","BP844","ATICO","BP855"],
+    ["ARFOX","BP870","BP871","BP872","ULPAX","BP874","NICRA","BP865"],
+    ["ODVAS","BP328","BP331","BP329","BEREV"],
+    ["VAJDI","JOZEP","BP834","BP844"],
+    ["ULZAK","JOZEP"],
+    ["EBAMO","BP837","BP836","BP835","BP834"],
+    ["KEZAL","OCRIT","ZURFA","BP885","BP884","BP883","ULPAX"],
+    ["EDEMU","LAHOR","LUCLA","BP883"],
+    ["BETED","LAHOR"],
+    ["BP855","BP856","FUTNA"],
+    ["BP865","BP866","OFENA"]
+  ],
+  "star13": [
+    ["EBAMO","BP741","BP742","BP743","BP744","ECMAN","BP755"],
+    ["ULZAK","JOZEP","BP723","BP733","BP743"],
+    ["ANEXA","BP736","BP735","BP734","BP733"],
+    ["VAJDI","JOZEP"],
+    ["KEZAL","OCRIT","ZURFA","BP772","ULPAX","BP774","CATUZ","BP765"],
+    ["BETED","LAHOR","LUCLA","BP783","ULPAX"],
+    ["EDEMU","LAHOR"],
+    ["ARFOX","BP786","BP785","BP784","BP783"],
+    ["BP755","BP756","TORAZ"],
+    ["BP765","BP766","GIFRA"]
+  ],
+  "holdings": [
+    {"fix":"JOZEP","inboundTrack":102,"isRightHand":true},
+    {"fix":"HUZTA","inboundTrack":312,"isRightHand":false},
+    {"fix":"ALZUR","inboundTrack":312,"isRightHand":true},
+    {"fix":"LAHOR","inboundTrack":232,"isRightHand":false},
+    {"fix":"TPS","inboundTrack":248,"isRightHand":false},
+    {"fix":"WONTA","inboundTrack":132,"isRightHand":true},
+    {"fix":"UTCON","inboundTrack":132,"isRightHand":false},
+    {"fix":"ZURFA","inboundTrack":312,"isRightHand":false}
+  ]
+}
