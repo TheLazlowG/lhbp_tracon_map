@@ -1,4 +1,5 @@
 import { L } from './leaflet.js';
+import { SoftBasemapTileLayer } from './basemap-tone.js';
 import { EDITOR_MODE } from './config.js';
 import { getOffsetPoint } from './geo.js';
 
@@ -143,20 +144,23 @@ const cartoAttribution = '&copy; <a href="https://www.openstreetmap.org/copyrigh
 const cartoTileOptions = {
     attribution: cartoAttribution,
     subdomains: 'abcd',
+    crossOrigin: true,
     maxZoom: 20
 };
-const darkAllWithLabels = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_BASEMAP_KEY}`, cartoTileOptions);
-const darkAllNoLabels   = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${CARTO_BASEMAP_KEY}`, cartoTileOptions);
+// Labels stay readable on their own unprocessed tile layer, below radar overlays.
+const basemapLabels = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=${CARTO_BASEMAP_KEY}`, { ...cartoTileOptions, zIndex: 2 });
+const darkAllNoLabels   = new SoftBasemapTileLayer(`https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${CARTO_BASEMAP_KEY}`, cartoTileOptions);
 
 const basemapEnabledInput = document.getElementById('basemap-enabled');
 const mapLabelsInput = document.getElementById('map-labels');
 
 function syncBasemap() {
-    map.removeLayer(darkAllWithLabels);
+    map.removeLayer(basemapLabels);
     map.removeLayer(darkAllNoLabels);
 
     if (basemapEnabledInput.checked) {
-        map.addLayer(mapLabelsInput.checked ? darkAllWithLabels : darkAllNoLabels);
+        map.addLayer(darkAllNoLabels);
+        if (mapLabelsInput.checked) map.addLayer(basemapLabels);
     }
 }
 
